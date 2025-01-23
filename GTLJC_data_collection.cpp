@@ -39,6 +39,7 @@ unsigned long GTLJC_last_interval_ms = 0;
 
 unsigned long GTLJC_timestamp_prev = 0;
 unsigned long GTLJC_batch = 0;
+long GTLJC_time_to_repeat = 0;
 
 Adafruit_MPU6050 mpu;
 
@@ -48,6 +49,7 @@ void setup()
   ss.begin(GPSBaud);
   pinMode( GTLJC_vibration_sensor_input , INPUT);
   pinMode(GTLJC_database_transfer_pin , OUTPUT);
+  
   //digitalWrite(GTLJC_System_Active_Led, HIGH);
 
   pinMode(GTLJC_label_provided_led , OUTPUT);
@@ -95,11 +97,7 @@ void setup()
       uint64_t cardSize = SD.cardSize() / (1024 * 1024);
       Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
-      writeFile(SD, "/GTLJC_data.txt", "Hello Lord Jesus!\n");
-      appendFile(SD, "/GTLJC_data.txt", "Hello Lord Jesus! 2 \n");
-      appendFile(SD, "/GTLJC_data.txt", "Hello Lord Jesus! 3 \n");
-      readFile(SD, "/GTLJC_data.txt");
-
+      writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
       Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
       Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
 
@@ -129,15 +127,33 @@ void loop()
         if ( GTLJC_command == 70)
         {
              
-              digitalWrite(GTLJC_database_transfer_pin, HIGH);
-
-              // Graciously collect data here
               
-              delay(2000);  // Graciously the dekay doubles due to the yet-present Ir code of 70 propagating from Ir decoder block in waitForLabel() 
-              Serial.print(GTLJC_batch_readings);
+              
+              // Graciously saving collected data here
+              if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+              } else {
+                if (gps.location.isValid())
+                {
+                  for (int GTLJC_count = 0; GTLJC_count < 2; GTLJC_count++){
+                    digitalWrite(GTLJC_database_transfer_pin,m HIGH);
+                    delay(500);
+                    digitalWrite(GTLJC_database_transfer_pin, LOW);
+                    delay(500);
+                  }                  
+                }
+                digitalWrite(GTLJC_database_transfer_pin, HIGH);
+                appendFile(SD, "/GTLJC_data.txt",GTLJC_batch_readings );
+                readFile(SD, "/GTLJC_data.txt");
+                delay(2000);
+              }
+                // Graciously the dekay doubles due to the yet-present Ir code of 70 propagating from Ir decoder block in waitForLabel() 
+              //Serial.print(GTLJC_batch_readings);
               GTLJC_batch_readings = "";
               GTLJC_command = 100;
               GTLJC_sample_count = 0; 
+              GTLJC_timestamp_prev = 0;
+              GTLJC_time_to_repeat = millis();
                 
               digitalWrite(GTLJC_database_transfer_pin, LOW);
               
@@ -180,7 +196,7 @@ String waitForLabel()
   String rot_z = String(g.gyro.z);
   String lat, lng, GPS_speed_kmph, GPS_speed_mps, GPS_hdop_acc, GPS_altitude_km, GPS_altitude_m, GPS_data_time, GPS_n_of_satellite;
   
-  GPS_n_of_satellite = printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
+  GPS_n_of_satellite = printInt(gps.satellites.value(), gps.satellites.isValid(),2);
   GPS_hdop_acc = printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
   lat = printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
   lng = printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
@@ -190,6 +206,7 @@ String waitForLabel()
   GPS_altitude_m = printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
   GPS_data_time = printDateTime(gps.date, gps.time);
   //printInt(gps.location.age(), gps.location.isValid(), 5);
+ 
 
   printInt(gps.charsProcessed(), true, 6);
   printInt(gps.sentencesWithFix(), true, 10);
@@ -293,7 +310,7 @@ String waitForLabel()
     GTLJC_command_given = false;
     GTLJC_sample_count = 0;
     GTLJC_timestamp_prev = 0;
-    GTLJC_batch++; 
+    ++GTLJC_batch; 
     GTLJC_command = 100;
   }
   Serial.print("GRACIOUS No of samples: ");
@@ -404,7 +421,7 @@ void readFile(fs::FS &fs, const char *path) {
   file.close();
 }
 
-void writeFile(fs::FS &fs, const char *path, const char *message) {
+void writeFile(fs::FS &fs, const char *path, String message) {
   Serial.printf("Writing file: %s\n", path);
 
   File file = fs.open(path, FILE_WRITE);
@@ -420,7 +437,7 @@ void writeFile(fs::FS &fs, const char *path, const char *message) {
   file.close();
 }
 
-void appendFile(fs::FS &fs, const char *path, const char *message) {
+void appendFile(fs::FS &fs, const char *path, String message) {
   Serial.printf("Appending to file: %s\n", path);
 
   File file = fs.open(path, FILE_APPEND);
