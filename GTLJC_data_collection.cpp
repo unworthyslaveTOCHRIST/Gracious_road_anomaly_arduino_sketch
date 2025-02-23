@@ -97,7 +97,8 @@ void setup()
       uint64_t cardSize = SD.cardSize() / (1024 * 1024);
       Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
-      writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
+      // writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
+      readFile(SD, "/GTLJC_data.txt");
       Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
       Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
 
@@ -136,7 +137,7 @@ void loop()
                 if (gps.location.isValid())
                 {
                   for (int GTLJC_count = 0; GTLJC_count < 2; GTLJC_count++){
-                    digitalWrite(GTLJC_database_transfer_pin,m HIGH);
+                    digitalWrite(GTLJC_database_transfer_pin,HIGH);
                     delay(500);
                     digitalWrite(GTLJC_database_transfer_pin, LOW);
                     delay(500);
@@ -147,7 +148,7 @@ void loop()
                 readFile(SD, "/GTLJC_data.txt");
                 delay(2000);
               }
-                // Graciously the dekay doubles due to the yet-present Ir code of 70 propagating from Ir decoder block in waitForLabel() 
+                // Graciously the delay doubles due to the yet-present Ir code of 70 propagating from Ir decoder block in waitForLabel() 
               //Serial.print(GTLJC_batch_readings);
               GTLJC_batch_readings = "";
               GTLJC_command = 100;
@@ -157,6 +158,37 @@ void loop()
                 
               digitalWrite(GTLJC_database_transfer_pin, LOW);
               
+
+        }
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 71){
+              GTLJC_batch_readings = "";
+              GTLJC_command = 100;
+              GTLJC_sample_count = 0; 
+              GTLJC_timestamp_prev = 0;
+              GTLJC_time_to_repeat = millis();
+              digitalWrite(GTLJC_database_transfer_pin, HIGH);
+              delay(2000);
+              digitalWrite(GTLJC_database_transfer_pin, LOW);
+
+        }
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if( GTLJC_command == 69){
+              writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
+              GTLJC_batch_readings = "";
+              GTLJC_command = 100;
+              GTLJC_sample_count = 0; 
+              GTLJC_timestamp_prev = 0;
+              GTLJC_time_to_repeat = millis();
+              digitalWrite(GTLJC_database_transfer_pin, HIGH);
+              delay(2000);
+              digitalWrite(GTLJC_database_transfer_pin, LOW);
 
         }
         
