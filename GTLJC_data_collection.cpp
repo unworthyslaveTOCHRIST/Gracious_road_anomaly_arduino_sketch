@@ -250,7 +250,7 @@ String waitForLabel()
   // delay(5000);
   String GTLJC_line_values = String(GTLJC_batch) + "," + String(GTLJC_timestamp) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time + "," + GPS_hdop_acc + "," + GPS_n_of_satellite + "," ;
   
-  if (GTLJC_command_given)
+  if (GTLJC_command_given && GTLJC_command != 0)
   {
 
     GTLJC_sample_count++;
