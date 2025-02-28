@@ -165,21 +165,24 @@ void loop()
                 ;
         }
         else if ( GTLJC_command == 71){
+
+              // Graciously erasing out a batch
               GTLJC_batch_readings = "";
               GTLJC_command = 100;
               GTLJC_sample_count = 0; 
               GTLJC_timestamp_prev = 0;
               GTLJC_time_to_repeat = millis();
               digitalWrite(GTLJC_database_transfer_pin, HIGH);
-              delay(2000);
+              delay(1000);
               digitalWrite(GTLJC_database_transfer_pin, LOW);
-
+              delay(1000);
         }
 
         if ((millis() - GTLJC_time_to_repeat) < 1000){
                 ;
         }
         else if ( GTLJC_command == 69){
+              // Graciously erasing out the entire memory
               writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
               GTLJC_batch_readings = "";
               GTLJC_command = 100;
@@ -187,9 +190,9 @@ void loop()
               GTLJC_timestamp_prev = 0;
               GTLJC_time_to_repeat = millis();
               digitalWrite(GTLJC_database_transfer_pin, HIGH);
-              delay(2000);
+              delay(1000);
               digitalWrite(GTLJC_database_transfer_pin, LOW);
-
+              delay(1000);
         }
         
       
