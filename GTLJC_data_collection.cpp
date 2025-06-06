@@ -121,7 +121,7 @@ void loop()
         if (GTLJC_label != "")
         {
               //GRACIOUSLY Piling
-                GTLJC_batch_readings += GTLJC_label;
+              GTLJC_batch_readings += GTLJC_label;
         }      
               // WiFiClient client;
         Serial.print(GTLJC_command);
@@ -146,7 +146,7 @@ void loop()
                 digitalWrite(GTLJC_database_transfer_pin, HIGH);
                 appendFile(SD, "/GTLJC_data.txt",GTLJC_batch_readings );
                 readFile(SD, "/GTLJC_data.txt");
-                delay(2000);
+                //delay(2000);
               }
                 // Graciously the delay doubles due to the yet-present Ir code of 70 propagating from Ir decoder block in waitForLabel() 
               //Serial.print(GTLJC_batch_readings);
@@ -160,14 +160,14 @@ void loop()
               
 
         }
-        
+
         if ((millis() - GTLJC_time_to_repeat) < 1000){
                 ;
         }
         else if ( GTLJC_command == 71){
 
               // Graciously erasing out a batch
-              GTLJC_batch_readings = "";
+              GTLJC_batch_readings = "";     
               GTLJC_command = 100;
               GTLJC_sample_count = 0; 
               GTLJC_timestamp_prev = 0;
@@ -185,6 +185,7 @@ void loop()
               // Graciously erasing out the entire memory
               writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
               GTLJC_batch_readings = "";
+              GTLJC_batch = 0;
               GTLJC_command = 100;
               GTLJC_sample_count = 0; 
               GTLJC_timestamp_prev = 0;
@@ -194,6 +195,7 @@ void loop()
               digitalWrite(GTLJC_database_transfer_pin, LOW);
               delay(1000);
         }
+
         
       
         //delay(2000);
@@ -215,6 +217,7 @@ String waitForLabel()
       GTLJC_command = IrReceiver.decodedIRData.command;
       GTLJC_command_given = true;
       Serial.println(GTLJC_command);
+      // delay(5000);
       IrReceiver.resume();
   }
   
@@ -253,24 +256,20 @@ String waitForLabel()
   if (millis() > 5000 && gps.charsProcessed() < 10)
     Serial.println(F("No GPS data received: check wiring"));
 
-  unsigned long GTLJC_timestamp = millis() -  GTLJC_last_interval_ms + GTLJC_timestamp_prev;
-  GTLJC_timestamp_prev = GTLJC_timestamp;
+  unsigned long GTLJC_timestamp = GTLJC_sample_count * 3;
+  // GTLJC_timestamp_prev = GTLJC_timestamp;
   // Serial.print("GRACIOUS Previous timestamp");
   // Serial.println(GTLJC_timestamp_prev);
   // delay(5000);
   String GTLJC_line_values = String(GTLJC_batch) + "," + String(GTLJC_timestamp) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time + "," + GPS_hdop_acc + "," + GPS_n_of_satellite + "," ;
- 
-  if (GTLJC_command = 0){
-    GTLJC_command_given = false;
-  }
-
+  
   if (GTLJC_command_given)
   {
 
     GTLJC_sample_count++;
     switch(GTLJC_command){
       case 68:
-        GTLJC_label = GTLJC_line_values + "SMOOTH,LOW\n";
+        GTLJC_label = GTLJC_line_values + "NO-MOVEMENT,LOW\n";
         break;
 
       case 64:
@@ -345,7 +344,7 @@ String waitForLabel()
 
   }
   
-  if (GTLJC_sample_count == 333){
+  if (GTLJC_sample_count == 300){
     GTLJC_command_given = false;
     GTLJC_sample_count = 0;
     GTLJC_timestamp_prev = 0;
