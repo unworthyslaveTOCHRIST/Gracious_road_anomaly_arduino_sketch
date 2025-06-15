@@ -11,6 +11,17 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include "WiFi.h"
+#include "HTTPClient.h"
+#include "ArduinoJson.h"
+
+const char* ssid = "unworthy slave TO CHRIST";
+const char* password = "FORCHRIST";
+
+const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone.pythonanywhere.com/api-road-prediction-output/road_anomaly_predict/";
+const char* API_VERIFICATION = "https://roadanomaly4christalone.pythonanywhere.com/api-road-verification/road_anomaly_verify/";
+const char* API_INFERENCE = "https://roadanomaly4christalone.pythonanywhere.com/api-road-inference-logs/road_anomaly_infer/";
+
 
 #define IR_RECEIVE_PIN 27
 #define IR_SEND_PIN  15
@@ -25,6 +36,7 @@ SoftwareSerial ss(RXPin, TXPin);
 
 
 String GTLJC_batch_readings = "";
+String GTLJC_batch_readings_json_send = "";
 
 int GTLJC_vibration_sensor_input = 27;
 int GTLJC_vibration;
@@ -41,40 +53,42 @@ unsigned long GTLJC_timestamp_prev = 0;
 unsigned long GTLJC_batch = 0;
 long GTLJC_time_to_repeat = 0;
 
+bool GTLJC_countIsComplete = false;
+
 Adafruit_MPU6050 mpu;
 
 void setup()
 {
-  Serial.begin(115200);
-  ss.begin(GPSBaud);
-  pinMode( GTLJC_vibration_sensor_input , INPUT);
-  pinMode(GTLJC_database_transfer_pin , OUTPUT);
-  
-  //digitalWrite(GTLJC_System_Active_Led, HIGH);
+      Serial.begin(115200);
+      ss.begin(GPSBaud);
+      pinMode( GTLJC_vibration_sensor_input , INPUT);
+      pinMode(GTLJC_database_transfer_pin , OUTPUT);
+      
+      //digitalWrite(GTLJC_System_Active_Led, HIGH);
 
-  pinMode(GTLJC_label_provided_led , OUTPUT);
-  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
+      pinMode(GTLJC_label_provided_led , OUTPUT);
+      IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
 
-  if(!mpu.begin()){
-    Serial.println("GLORY TO GOD ALONE, Failed to find mpu chip");
-    while(1)
-      delay(10);
-  }
+      if(!mpu.begin()){
+        Serial.println("GLORY TO GOD ALONE, Failed to find mpu chip");
+        while(1)
+          delay(10);
+      }
 
-  Serial.println("MPU6050 GRACIOUSLY Found");
-  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-  Serial.print("Accelerometer range set to: ");
-  Serial.println("+-8G");
-  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  Serial.print("Gyro range set to: ");
-  Serial.println("+- 500 deg/s");
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-  Serial.print("Filter bandwidth set to: ");
-  Serial.println("21 Hz");
+      Serial.println("MPU6050 GRACIOUSLY Found");
+      mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+      Serial.print("Accelerometer range set to: ");
+      Serial.println("+-8G");
+      mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+      Serial.print("Gyro range set to: ");
+      Serial.println("+- 500 deg/s");
+      mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+      Serial.print("Filter bandwidth set to: ");
+      Serial.println("21 Hz");
 
-  if (!SD.begin()) {
-        Serial.println("Card Mount Failed");
-        return;
+      if (!SD.begin()) {
+            Serial.println("Card Mount Failed");
+            return;
       }
       uint8_t cardType = SD.cardType();
 
@@ -102,7 +116,152 @@ void setup()
       Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
       Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
 
+      
+
+
+
+
+      
+
+
 }
+
+void GTLJC_parseJsonResponse(const String& jsonString){
+  const size_t capacity = 4096;
+  DynamicJsonDocument doc(capacity);
+
+  DeserializationError error = deserializeJson(doc, jsonString);
+  if(error){
+      Serial.print("JSON deserialization failed: ");
+      Serial.println(error.c_str());
+      return;
+  }
+
+  Serial.println("\n--- Parsed JSON Fields ---");
+
+  if (!doc.is<JsonArray>()) {
+    Serial.println("Expected JSON Array but got something else.");
+    return;
+  }
+
+  for (JsonObject obj : doc.as<JsonArray>()) {
+    Serial.println("--- Entry ---");
+    for (JsonPair kv : obj) {
+      Serial.print(kv.key().c_str());
+      Serial.print(": ");
+      Serial.println(kv.value().as<String>());
+    }
+    Serial.println("--------------");
+  }
+
+}
+
+// Gracious routine for fetching predictions
+void GTLJC_fetchJsonData(){
+    // Graciously connect to WiFi
+    WiFi.begin(ssid,password);
+    Serial.print("Connecting to WiFi");
+    while(WiFi.status() != WL_CONNECTED){
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println("\nConnected to WiFi");
+
+    if((WiFi.status() == WL_CONNECTED)){
+          HTTPClient http;
+          http.begin(API_PREDICTION_OUTPUT);
+
+          int httpCode = http.GET();
+
+          if (httpCode > 0){
+              String payload = http.getString();
+              Serial.println("\n--- JSON from GET ---");
+              Serial.println(payload);
+
+              GTLJC_parseJsonResponse(payload);
+          }
+          else{
+            Serial.print("GET failed. HTTP error code: ");
+            Serial.println(httpCode);
+          }
+
+          http.end();
+
+          GTLJC_command = 100;
+          delay(15000);
+
+        
+    }
+}
+
+String fieldNames[] = {
+  "batch_id",
+  "acc_x", "acc_y", "acc_z",
+  "rot_x", "rot_y", "rot_z",
+  "speed","log_interval",
+  "latitude", "longitude", 
+  "accuracy","timestamp"
+};
+
+// Gracious routine for sending Json
+void GTLJC_sendJsonBatch(String rawBatch) {
+          // Graciously connect to WiFi
+          WiFi.begin(ssid,password);
+          Serial.print("Connecting to WiFi");
+          while(WiFi.status() != WL_CONNECTED){
+            delay(500);
+            Serial.print(".");
+          }
+          Serial.println("\nConnected to WiFi");
+
+          DynamicJsonDocument payloadDoc(2048); // Adjust size based on expected data volume
+          JsonArray dataArray = payloadDoc.to<JsonArray>();
+
+          int startIdx = 0;
+          while (startIdx < rawBatch.length()) {
+            int endIdx = rawBatch.indexOf('\n', startIdx);
+            if (endIdx == -1) endIdx = rawBatch.length(); // Last line
+
+            String row = rawBatch.substring(startIdx, endIdx);
+            row.trim();
+
+            if (row.length() > 0) {
+              JsonObject entry = dataArray.createNestedObject();
+              int lastIdx = 0;
+              for (int i = 0; i < 13; i++) {
+                int commaIdx = row.indexOf(',', lastIdx);
+                if (i == 12 || commaIdx == -1) commaIdx = row.length(); // timestamp or last field
+                String value = row.substring(lastIdx, commaIdx);
+                value.trim();
+                entry[fieldNames[i]] = value;
+                lastIdx = commaIdx + 1;
+              }
+            }
+
+            startIdx = endIdx + 1;
+          }
+          
+
+          // Convert to string
+          String jsonStr;
+          serializeJson(payloadDoc, jsonStr);
+
+          // Send to server
+          HTTPClient http;
+          http.begin(API_INFERENCE);
+          http.addHeader("Content-Type", "application/json");
+
+          int httpResponseCode = http.POST(jsonStr);
+          Serial.println("CHRISTLY POST Response Code: " + String(httpResponseCode));
+          Serial.println("Sent Payload:");
+          Serial.println(jsonStr);
+
+          http.end();
+
+          GTLJC_command = 100;
+          delay(15000);
+}
+
 
 void loop()
 {
@@ -124,13 +283,12 @@ void loop()
               GTLJC_batch_readings += GTLJC_label;
         }      
               // WiFiClient client;
-        Serial.print(GTLJC_command);
+        Serial.print("Gracious command code: ");
+        Serial.println(GTLJC_command);
+        
         if ( GTLJC_command == 70)
         {
-             
-              
-              
-              // Graciously saving collected data here
+        // Graciously saving collected data here
               if ((millis() - GTLJC_time_to_repeat) < 1000){
                 ;
               } else {
@@ -183,7 +341,7 @@ void loop()
         }
         else if ( GTLJC_command == 69){
               // Graciously erasing out the entire memory
-              writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
+              writeFile(SD, "/GTLJC_data.txt","batch,acc_x,acc_y,acc_z,rot_x,rot_y,rot_z,speed,log_interval,latitude,longitude,accuracy,timestamp\n");
               GTLJC_batch_readings = "";
               GTLJC_batch = 0;
               GTLJC_command = 100;
@@ -196,6 +354,23 @@ void loop()
               delay(1000);
         }
 
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 66){
+          // To graciously handle outgoing inference data 
+          GTLJC_sendJsonBatch(GTLJC_batch_readings);
+
+        }
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 74){
+          // To graciously handle incoming predictions 
+          GTLJC_fetchJsonData();
+
+        }
         
       
         //delay(2000);
@@ -261,7 +436,9 @@ String waitForLabel()
   // Serial.print("GRACIOUS Previous timestamp");
   // Serial.println(GTLJC_timestamp_prev);
   // delay(5000);
-  String GTLJC_line_values = String(GTLJC_batch) + "," + String(GTLJC_timestamp) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time + "," + GPS_hdop_acc + "," + GPS_n_of_satellite + "," ;
+  //String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_hdop_acc + ","  + String(GTLJC_timestamp) + ","  + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time  + "," + GPS_n_of_satellite + "," ;
+  String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_timestamp) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time  + "," ;
+  String GTLJC_iine_values_send = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_timestamp) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time;
   
   if (GTLJC_command_given)
   {
@@ -269,76 +446,80 @@ String waitForLabel()
     GTLJC_sample_count++;
     switch(GTLJC_command){
       case 68:
-        GTLJC_label = GTLJC_line_values + "NO-MOVEMENT,LOW\n";
+        GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";
+        if(GTLJC_sample_count == 300){
+          GTLJC_countIsComplete = true;
+        }
+        
         break;
 
       case 64:
-        GTLJC_label = GTLJC_line_values + "SMOOTH,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "smooth,AVERAGE\n";
         break;
 
       case 67:
-        GTLJC_label = GTLJC_line_values + "SMOOTH,HIGH\n";
+        GTLJC_label = GTLJC_line_values + "walking,HIGH\n";
         break;
 
       case 7:
-        GTLJC_label = GTLJC_line_values + "CRACKED/CORRUGATED,LOW\n";
+        GTLJC_label = GTLJC_line_values + "crack,LOW\n";
         break;
 
       case 21:
-        GTLJC_label = GTLJC_line_values + "CRACKED/CORRUGATED,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "crack,AVERAGE\n";
         break;
 
       case 9:
-        GTLJC_label = GTLJC_line_values + "CRACKED/CORRUGATED,HIGH\n";
+        GTLJC_label = GTLJC_line_values + "crack,HIGH\n";
         break;
 
       case 22:
-        GTLJC_label = GTLJC_line_values + "BUMP,LOW\n";
+        GTLJC_label = GTLJC_line_values + "bump,LOW\n";
         break;
       
       case 25:
-        GTLJC_label = GTLJC_line_values + "BUMP,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "bump,AVERAGE\n";
         break;
 
       case 13:
-        GTLJC_label = GTLJC_line_values + "BUMP,HIGH\n";
+        GTLJC_label = GTLJC_line_values + "bump,HIGH\n";
         break;
       
       case 12:
-        GTLJC_label = GTLJC_line_values + "ROAD-PATCH,LOW\n";
+        GTLJC_label = GTLJC_line_values + "road-patch,LOW\n";
         break;
 
       case 24:
-        GTLJC_label = GTLJC_line_values + "ROAD-PATCH,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "road-patch,AVERAGE\n";
         break;
 
       case 94:
-        GTLJC_label = GTLJC_line_values + "ROAD-PATCH,HIGH\n";
+        GTLJC_label = GTLJC_line_values + "road-patch,HIGH\n";
         break;
 
       case 8:
-        GTLJC_label = GTLJC_line_values + "POTHOLE-MILD,LOW\n";
+        GTLJC_label = GTLJC_line_values + "pothole_mild,LOW\n";
         break;
       
       case 28:
-        GTLJC_label = GTLJC_line_values + "POTHOLE-MILD,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "pothole_mild,AVERAGE\n";
         break;
 
       case 90:
-        GTLJC_label = GTLJC_line_values + "POTHOLE-MILD,HIGH\n";
+        GTLJC_label = GTLJC_line_values + "pothole_mild,HIGH\n";
         break;
 
-      case 66:
-        GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,LOW\n";
-        break;
+      // case 66:
+      //   GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,LOW\n";
+      //   break;
 
       case 82:
-        GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "pothole_severe,AVERAGE\n";
         break;
 
-      case 74:
-        GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,HIGH\n";
-        break;
+      // case 74:
+      //   GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,HIGH\n";
+      //   break;
       
     }
 
@@ -350,6 +531,7 @@ String waitForLabel()
     GTLJC_timestamp_prev = 0;
     ++GTLJC_batch; 
     GTLJC_command = 100;
+    
   }
   Serial.print("GRACIOUS No of samples: ");
   Serial.println(GTLJC_sample_count);
