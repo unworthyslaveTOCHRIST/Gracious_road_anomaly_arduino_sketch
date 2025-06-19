@@ -21,7 +21,7 @@ const char* password = "FORCHRIST";
 const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone.pythonanywhere.com/api-road-prediction-output/road_anomaly_predict/";
 const char* API_VERIFICATION = "https://roadanomaly4christalone.pythonanywhere.com/api-road-verification/road_anomaly_verify/";
 const char* API_INFERENCE = "https://roadanomaly4christalone.pythonanywhere.com/api-road-inference-logs/road_anomaly_infer/";
-
+const char* API_INFERENCE_NON_JSON = "https://roadanomaly4christalone.pythonanywhere.com/api-road-inference-logs-raw/road_anomaly_inference_raw/";
 
 #define IR_RECEIVE_PIN 27
 #define IR_SEND_PIN  15
@@ -37,6 +37,8 @@ SoftwareSerial ss(RXPin, TXPin);
 
 String GTLJC_batch_readings = "";
 String GTLJC_batch_readings_json_send = "";
+
+String GTLJC_batch_results[2];
 
 int GTLJC_vibration_sensor_input = 27;
 int GTLJC_vibration;
@@ -198,13 +200,14 @@ String fieldNames[] = {
   "batch_id",
   "acc_x", "acc_y", "acc_z",
   "rot_x", "rot_y", "rot_z",
-  "speed","log_interval",
+  "speed",
   "latitude", "longitude", 
-  "accuracy","timestamp"
+  "accuracy","timestamp",
+  "log_interval"
 };
 
 // Gracious routine for sending Json
-void GTLJC_sendJsonBatch(String rawBatch) {
+void GTLJC_sendJsonBatch(const String& rawBatch) {
           // Graciously connect to WiFi
           WiFi.begin(ssid,password);
           Serial.print("Connecting to WiFi");
@@ -214,41 +217,19 @@ void GTLJC_sendJsonBatch(String rawBatch) {
           }
           Serial.println("\nConnected to WiFi");
 
-          DynamicJsonDocument payloadDoc(2048); // Adjust size based on expected data volume
-          JsonArray dataArray = payloadDoc.to<JsonArray>();
+          // Construct JSON payload with two fields: data (raw string) and timestamp
+          DynamicJsonDocument doc(2048);  // Enough for a simple 2-field JSON
+          JsonObject root = doc.to<JsonObject>();
 
-          int startIdx = 0;
-          while (startIdx < rawBatch.length()) {
-            int endIdx = rawBatch.indexOf('\n', startIdx);
-            if (endIdx == -1) endIdx = rawBatch.length(); // Last line
+          root["data"] = rawBatch;
+          root["timestamp"] = millis();  // Or replace with a real-time clock value if you have one
 
-            String row = rawBatch.substring(startIdx, endIdx);
-            row.trim();
-
-            if (row.length() > 0) {
-              JsonObject entry = dataArray.createNestedObject();
-              int lastIdx = 0;
-              for (int i = 0; i < 13; i++) {
-                int commaIdx = row.indexOf(',', lastIdx);
-                if (i == 12 || commaIdx == -1) commaIdx = row.length(); // timestamp or last field
-                String value = row.substring(lastIdx, commaIdx);
-                value.trim();
-                entry[fieldNames[i]] = value;
-                lastIdx = commaIdx + 1;
-              }
-            }
-
-            startIdx = endIdx + 1;
-          }
-          
-
-          // Convert to string
           String jsonStr;
-          serializeJson(payloadDoc, jsonStr);
+          serializeJson(doc, jsonStr);
 
-          // Send to server
+          // Send the payload
           HTTPClient http;
-          http.begin(API_INFERENCE);
+          http.begin(API_INFERENCE);  // Assuming API_INFERENCE is defined
           http.addHeader("Content-Type", "application/json");
 
           int httpResponseCode = http.POST(jsonStr);
@@ -258,6 +239,7 @@ void GTLJC_sendJsonBatch(String rawBatch) {
 
           http.end();
 
+          // Reset command code
           GTLJC_command = 100;
           delay(15000);
 }
@@ -273,7 +255,11 @@ void loop()
   // else
   
     //GTLJC_vibration = pulseIn (GTLJC_vibration_sensor_input, HIGH);
-    String GTLJC_label =  waitForLabel();
+    waitForLabel();
+    String GTLJC_label =  GTLJC_batch_results[0];
+    String GTLJC_label_2 =  GTLJC_batch_results[1];
+
+    
     
     //digitalWrite(GTLJC_label_provided_led, LOW);
     
@@ -281,7 +267,15 @@ void loop()
         {
               //GRACIOUSLY Piling
               GTLJC_batch_readings += GTLJC_label;
-        }      
+        }   
+
+        if (GTLJC_label_2 != "")
+        {
+              //GRACIOUSLY Piling Inference data in the correct structure
+            GTLJC_batch_readings_json_send +=  GTLJC_label_2;
+        }
+
+
               // WiFiClient client;
         Serial.print("Gracious command code: ");
         Serial.println(GTLJC_command);
@@ -302,13 +296,15 @@ void loop()
                   }                  
                 }
                 digitalWrite(GTLJC_database_transfer_pin, HIGH);
-                appendFile(SD, "/GTLJC_data.txt",GTLJC_batch_readings );
+                // appendFile(SD, "/GTLJC_data.txt",GTLJC_batch_readings );
+                appendFile(SD, "/GTLJC_data.txt", GTLJC_batch_readings);      
                 readFile(SD, "/GTLJC_data.txt");
                 //delay(2000);
               }
                 // Graciously the delay doubles due to the yet-present Ir code of 70 propagating from Ir decoder block in waitForLabel() 
               //Serial.print(GTLJC_batch_readings);
               GTLJC_batch_readings = "";
+              // GTLJC_batch_readings_json_send = "";
               GTLJC_command = 100;
               GTLJC_sample_count = 0; 
               GTLJC_timestamp_prev = 0;
@@ -325,7 +321,8 @@ void loop()
         else if ( GTLJC_command == 71){
 
               // Graciously erasing out a batch
-              GTLJC_batch_readings = "";     
+              GTLJC_batch_readings = "";   
+              // GTLJC_batch_readings_json_send = "";  
               GTLJC_command = 100;
               GTLJC_sample_count = 0; 
               GTLJC_timestamp_prev = 0;
@@ -341,8 +338,9 @@ void loop()
         }
         else if ( GTLJC_command == 69){
               // Graciously erasing out the entire memory
-              writeFile(SD, "/GTLJC_data.txt","batch,acc_x,acc_y,acc_z,rot_x,rot_y,rot_z,speed,log_interval,latitude,longitude,accuracy,timestamp\n");
+              writeFile(SD, "/GTLJC_data.txt","batch,acc_x,acc_y,acc_z,rot_x,rot_y,rot_z,speed,latitude,longitude,accuracy,timestamp,log_interval\n");
               GTLJC_batch_readings = "";
+              // GTLJC_batch_readings_json_send = "";
               GTLJC_batch = 0;
               GTLJC_command = 100;
               GTLJC_sample_count = 0; 
@@ -359,7 +357,10 @@ void loop()
         }
         else if ( GTLJC_command == 66){
           // To graciously handle outgoing inference data 
-          GTLJC_sendJsonBatch(GTLJC_batch_readings);
+          
+          GTLJC_sendJsonBatch(GTLJC_batch_readings_json_send);
+          // Serial.print(GTLJC_batch_readings_json_send);
+          GTLJC_batch_readings_json_send = "";
 
         }
 
@@ -376,7 +377,7 @@ void loop()
         //delay(2000);
 }
 
-String waitForLabel()
+void waitForLabel()
 {
   
   if (GTLJC_sample_count == 0){
@@ -438,7 +439,8 @@ String waitForLabel()
   // delay(5000);
   //String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_hdop_acc + ","  + String(GTLJC_timestamp) + ","  + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time  + "," + GPS_n_of_satellite + "," ;
   String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_timestamp) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time  + "," ;
-  String GTLJC_iine_values_send = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_timestamp) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time;
+  String GTLJC_line_values_send = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time + "," + String(GTLJC_sample_count) + "\n";
+  String GTLJC_label_2 = GTLJC_line_values_send;
   
   if (GTLJC_command_given)
   {
@@ -446,11 +448,7 @@ String waitForLabel()
     GTLJC_sample_count++;
     switch(GTLJC_command){
       case 68:
-        GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";
-        if(GTLJC_sample_count == 300){
-          GTLJC_countIsComplete = true;
-        }
-        
+        GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";     
         break;
 
       case 64:
@@ -536,9 +534,9 @@ String waitForLabel()
   Serial.print("GRACIOUS No of samples: ");
   Serial.println(GTLJC_sample_count);
   //delay(5000);
-  return GTLJC_label;
-
-
+  // return GTLJC_label;
+  GTLJC_batch_results[0] = GTLJC_label;
+  GTLJC_batch_results[1] = GTLJC_label_2;
 }
 
 // Gracious functions to handle gps input
