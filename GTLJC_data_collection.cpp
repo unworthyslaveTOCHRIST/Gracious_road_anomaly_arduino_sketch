@@ -61,6 +61,7 @@ Adafruit_MPU6050 mpu;
 
 void setup()
 {
+
       Serial.begin(115200);
       ss.begin(GPSBaud);
       pinMode( GTLJC_vibration_sensor_input , INPUT);
@@ -118,12 +119,6 @@ void setup()
       Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
       Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
 
-      
-
-
-
-
-      
 
 
 }
@@ -178,7 +173,7 @@ void GTLJC_fetchJsonData(){
           if (httpCode > 0){
               String payload = http.getString();
               Serial.println("\n--- JSON from GET ---");
-              Serial.println(payload);
+              // Serial.println(payload);
 
               GTLJC_parseJsonResponse(payload);
           }
@@ -190,7 +185,8 @@ void GTLJC_fetchJsonData(){
           http.end();
 
           GTLJC_command = 100;
-          delay(15000);
+          // WiFi.disconnect(true);
+          delay(5000);
 
         
     }
@@ -217,31 +213,74 @@ void GTLJC_sendJsonBatch(const String& rawBatch) {
           }
           Serial.println("\nConnected to WiFi");
 
-          // Construct JSON payload with two fields: data (raw string) and timestamp
-          DynamicJsonDocument doc(2048);  // Enough for a simple 2-field JSON
-          JsonObject root = doc.to<JsonObject>();
+          DynamicJsonDocument payloadDoc(8192); // Adjust size based on expected data volume
+          JsonArray dataArray = payloadDoc.to<JsonArray>();
 
-          root["data"] = rawBatch;
-          root["timestamp"] = millis();  // Or replace with a real-time clock value if you have one
+          int startIdx = 0;
+          while (startIdx < rawBatch.length()) {
+            int endIdx = rawBatch.indexOf('\n', startIdx);
+            if (endIdx == -1) endIdx = rawBatch.length(); // Last line
 
+            String row = rawBatch.substring(startIdx, endIdx);
+            row.trim();
+
+            if (row.length() > 0) {
+              JsonObject entry = dataArray.createNestedObject();
+              int lastIdx = 0;
+              for (int i = 0; i < 13; i++) {
+                int commaIdx = row.indexOf(',', lastIdx);
+                if (i == 12 || commaIdx == -1) commaIdx = row.length(); // timestamp or last field
+                String value = row.substring(lastIdx, commaIdx);
+                value.trim();
+                entry[fieldNames[i]] = value;
+                
+                lastIdx = commaIdx + 1;
+              }
+              serializeJson(entry, Serial);
+              Serial.println();
+              
+
+              // Serial.println(entry.to<String>());
+            }
+
+            startIdx = endIdx + 1;
+          }
+          
+          
+
+          // Convert to string
           String jsonStr;
-          serializeJson(doc, jsonStr);
+          serializeJson(payloadDoc, jsonStr);
+          
 
-          // Send the payload
+          // // Send to server
+          // HTTPClient http;
+          // http.begin(API_INFERENCE);
+          // http.addHeader("Content-Type", "application/json");
+
+          // int httpResponseCode = http.POST(jsonStr);
+          // Serial.println("CHRISTLY POST Response Code: " + String(httpResponseCode));
+          // Serial.println("Sent Payload:");
+          // Serial.println(jsonStr);
+
+          // http.end();
+
           HTTPClient http;
-          http.begin(API_INFERENCE);  // Assuming API_INFERENCE is defined
-          http.addHeader("Content-Type", "application/json");
+          http.begin(API_INFERENCE);
+          http.addHeader("Content-type","text/plain");
 
-          int httpResponseCode = http.POST(jsonStr);
-          Serial.println("CHRISTLY POST Response Code: " + String(httpResponseCode));
-          Serial.println("Sent Payload:");
-          Serial.println(jsonStr);
+          int httpResponseCode = http.POST(rawBatch);
+
+          Serial.println("Sent raw batch to server: ");
+          Serial.println(rawBatch);
+          Serial.println("Server Graciously responded with: ");
+          Serial.println(httpResponseCode);
 
           http.end();
 
-          // Reset command code
           GTLJC_command = 100;
-          delay(15000);
+          WiFi.disconnect(true);
+          delay(5000);
 }
 
 
@@ -271,7 +310,7 @@ void loop()
 
         if (GTLJC_label_2 != "")
         {
-              //GRACIOUSLY Piling Inference data in the correct structure
+            //GRACIOUSLY Piling Inference data in the correct structure
             GTLJC_batch_readings_json_send +=  GTLJC_label_2;
         }
 
@@ -523,7 +562,7 @@ void waitForLabel()
 
   }
   
-  if (GTLJC_sample_count == 300){
+  if (GTLJC_sample_count == 20){
     GTLJC_command_given = false;
     GTLJC_sample_count = 0;
     GTLJC_timestamp_prev = 0;
