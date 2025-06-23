@@ -1,5 +1,4 @@
 // ALL THANKS AND GLORY TO THE AND my ONLY GOD AND LORD JESUS CHRIST ALONE
-
 ///////////////The Lord's Grace and Mercy//////////////////
 
 #include <IRremote.hpp> // include the library
@@ -14,9 +13,14 @@
 #include "WiFi.h"
 #include "HTTPClient.h"
 #include "ArduinoJson.h"
+#include <WiFiClientSecure.h>
 
 const char* ssid = "unworthy slave TO CHRIST";
 const char* password = "FORCHRIST";
+const char* GTLJC_host = "roadanomaly4christalone.pythonanywhere.com";
+const int GTLJC_httpsPort = 443;
+const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
+
 
 const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone.pythonanywhere.com/api-road-prediction-output/road_anomaly_predict/";
 const char* API_VERIFICATION = "https://roadanomaly4christalone.pythonanywhere.com/api-road-verification/road_anomaly_verify/";
@@ -115,9 +119,17 @@ void setup()
       Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
       // writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
-      readFile(SD, "/GTLJC_data.txt");
+      // readFile(SD, "/GTLJC_data.txt");
       Serial.printf("Total space: %lluMB\n", SD.totalBytes() / (1024 * 1024));
       Serial.printf("Used space: %lluMB\n", SD.usedBytes() / (1024 * 1024));
+
+      WiFi.begin(ssid,password);
+      Serial.print("Connecting to WiFi");
+      while(WiFi.status() != WL_CONNECTED){
+        delay(500);
+        Serial.print(".");
+      }
+      Serial.println("\nConnected to WiFi");
 
 
 
@@ -155,14 +167,6 @@ void GTLJC_parseJsonResponse(const String& jsonString){
 
 // Gracious routine for fetching predictions
 void GTLJC_fetchJsonData(){
-    // Graciously connect to WiFi
-    WiFi.begin(ssid,password);
-    Serial.print("Connecting to WiFi");
-    while(WiFi.status() != WL_CONNECTED){
-      delay(500);
-      Serial.print(".");
-    }
-    Serial.println("\nConnected to WiFi");
 
     if((WiFi.status() == WL_CONNECTED)){
           HTTPClient http;
@@ -204,83 +208,44 @@ String fieldNames[] = {
 
 // Gracious routine for sending Json
 void GTLJC_sendJsonBatch(const String& rawBatch) {
-          // Graciously connect to WiFi
-          WiFi.begin(ssid,password);
-          Serial.print("Connecting to WiFi");
-          while(WiFi.status() != WL_CONNECTED){
-            delay(500);
-            Serial.print(".");
-          }
-          Serial.println("\nConnected to WiFi");
-
-          DynamicJsonDocument payloadDoc(8192); // Adjust size based on expected data volume
-          JsonArray dataArray = payloadDoc.to<JsonArray>();
-
-          int startIdx = 0;
-          while (startIdx < rawBatch.length()) {
-            int endIdx = rawBatch.indexOf('\n', startIdx);
-            if (endIdx == -1) endIdx = rawBatch.length(); // Last line
-
-            String row = rawBatch.substring(startIdx, endIdx);
-            row.trim();
-
-            if (row.length() > 0) {
-              JsonObject entry = dataArray.createNestedObject();
-              int lastIdx = 0;
-              for (int i = 0; i < 13; i++) {
-                int commaIdx = row.indexOf(',', lastIdx);
-                if (i == 12 || commaIdx == -1) commaIdx = row.length(); // timestamp or last field
-                String value = row.substring(lastIdx, commaIdx);
-                value.trim();
-                entry[fieldNames[i]] = value;
-                
-                lastIdx = commaIdx + 1;
-              }
-              serializeJson(entry, Serial);
-              Serial.println();
-              
-
-              // Serial.println(entry.to<String>());
-            }
-
-            startIdx = endIdx + 1;
-          }
-          
-          
-
-          // Convert to string
-          String jsonStr;
-          serializeJson(payloadDoc, jsonStr);
-          
-
-          // // Send to server
+          Serial.print(rawBatch);
+          WiFiClientSecure client;
+          client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
           // HTTPClient http;
-          // http.begin(API_INFERENCE);
-          // http.addHeader("Content-Type", "application/json");
 
-          // int httpResponseCode = http.POST(jsonStr);
-          // Serial.println("CHRISTLY POST Response Code: " + String(httpResponseCode));
-          // Serial.println("Sent Payload:");
-          // Serial.println(jsonStr);
+          Serial.print("🌐 Connecting to ");
+          Serial.println(GTLJC_host);
 
-          // http.end();
+          if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
+            Serial.println("❌ HTTPS connection failed");
+            return;
+          }
 
-          HTTPClient http;
-          http.begin(API_INFERENCE);
-          http.addHeader("Content-type","text/plain");
+          // Graciously sending HTTP headers and body
+          client.println("POST " + String(GTLJC_path_inference) + " HTTP/1.1");
+          client.println("Host: " + String(GTLJC_host));
+          client.println("Content-Type: text/plain");
+          client.println("Connection: close");
+          client.print("Content-Length: ");
+          client.println(rawBatch.length());
+          client.println();  // End of headers
+          client.print(rawBatch); // Send raw data
 
-          int httpResponseCode = http.POST(rawBatch);
+          // Graciously reading server response
+          Serial.println("📨 Server Response:");
+          while(client.connected()) {
+            while(client.available()){
+              String line = client.readStringUntil('\n');
+              Serial.println(line);
+            }
+          }
 
-          Serial.println("Sent raw batch to server: ");
-          Serial.println(rawBatch);
-          Serial.println("Server Graciously responded with: ");
-          Serial.println(httpResponseCode);
-
-          http.end();
+          client.stop();
+          Serial.println("✅ HTTPS text POST complete.");
 
           GTLJC_command = 100;
-          WiFi.disconnect(true);
-          delay(5000);
+          // WiFi.disconnect(true);
+          delay(60000);
 }
 
 
@@ -478,7 +443,20 @@ void waitForLabel()
   // delay(5000);
   //String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_hdop_acc + ","  + String(GTLJC_timestamp) + ","  + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time  + "," + GPS_n_of_satellite + "," ;
   String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_timestamp) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time  + "," ;
-  String GTLJC_line_values_send = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time + "," + String(GTLJC_sample_count) + "\n";
+  String GTLJC_line_values_send = String(GTLJC_batch) + "," + 
+                                                acc_x + "," + 
+                                                acc_y + "," + 
+                                                acc_z + "," + 
+                                                rot_x + "," + 
+                                                rot_y + "," + 
+                                                rot_z + "," + 
+                                                GPS_speed_mps + ","  + 
+                                                lat + "," + 
+                                                lng + ","  + 
+                                                GPS_hdop_acc + ","  + 
+                                                GPS_data_time + "," + 
+                                                String(GTLJC_sample_count) + "\n";
+                                                
   String GTLJC_label_2 = GTLJC_line_values_send;
   
   if (GTLJC_command_given)
