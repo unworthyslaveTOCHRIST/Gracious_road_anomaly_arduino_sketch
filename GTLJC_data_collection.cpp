@@ -318,6 +318,9 @@ void GTLJC_sendPredictionRequest(const String& requestMessage){
           Serial.println("\n✅ HTTPS prediction request-text POST complete.");
 
           GTLJC_command = 100;
+          requestMessage = "";
+          Serial.print("Checking if request message is emptied, request-message-content : ")
+          Serial.println(requestMessage);
           // WiFi.disconnect(true);
           delay(2000);
 }
@@ -393,7 +396,7 @@ void loop()
 
             // Graciously getting predictions and taking verification steps
             String predictionRequestMessage = "get_predictions";
-            GTLJC_sendPredictionRequest()
+            GTLJC_sendPredictionRequest(predictionRequestMessage)
             // GTLJC_fetchJsonData();  // Graciously getting predictions
         
         }
