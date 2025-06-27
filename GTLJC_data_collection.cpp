@@ -20,6 +20,7 @@ const char* password = "FORCHRIST";
 const char* GTLJC_host = "roadanomaly4christalone.pythonanywhere.com";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
+const char* GTLJC_path_predictions = "/api-road-prediction-output/road_anomaly_predict/";
 
 const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone.pythonanywhere.com/api-road-prediction-output/road_anomaly_predict/";
 const char* API_VERIFICATION = "https://roadanomaly4christalone.pythonanywhere.com/api-road-verification/road_anomaly_verify/";
@@ -253,15 +254,82 @@ void GTLJC_sendJsonBatch(const String& rawBatch) {
 
           GTLJC_command = 100;
           // WiFi.disconnect(true);
-          delay(5000);
+          delay(2000);
 }
 
+void countLoggedLines(){
+  File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
+  if(!GTLJC_dataFile){
+    Serial.println("❌ Failed to open file for counting lines.");
+    return;
+  }
+
+  int GTLJC_lineCount = 0;
+  while(GTLJC_dataFile.available()){
+    String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
+    if (GTLJC_line.length() > 0){
+      ++GTLJC_line;
+    }
+  }
+
+  GTLJC_dataFile.close();
+  Serial.print("✅ Total number of logged lines: ");
+  Serial.println(GTLJC_lineCount);
+}
+
+void GTLJC_sendPredictionRequest(const String& requestMessage){
+          WiFiClientSecure client;
+          client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
+          // HTTPClient http;
+
+          Serial.print("🌐 Connecting to ");
+          Serial.println(GTLJC_host);
+
+          if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
+            Serial.println("❌ HTTPS connection failed");
+            return;
+          }
+
+          // Graciously sending HTTP headers and body
+          client.println("POST " + String(GTLJC_path_predictions) + " HTTP/1.1");
+          client.println("Host: " + String(GTLJC_host));
+          client.println("Content-Type: text/plain");
+          client.println("Connection: close");
+          client.print("Content-Length: ");
+          client.println(requestMessage.length());
+          client.println();  // End of headers
+          
+          client.write((const uint8_t *)requestMessage.c_str(), requestMessage.length());
+          Serial.print(requestMessage);
+          // client.print(rawBatch); // Send raw data
+          
+
+          // Graciously reading server response
+          Serial.println("📨 Server Response:");
+          while (client.connected() || client.available()) {
+            if (client.available()) {
+              char c = client.read();
+              Serial.print(c);
+            }
+          }
+
+          // ✅ Always close the connection
+          client.stop();
+          Serial.println("\n✅ HTTPS prediction request-text POST complete.");
+
+          GTLJC_command = 100;
+          // WiFi.disconnect(true);
+          delay(2000);
+}
 
 void loop()
 {
         if ( GTLJC_command == 8){  // Collect-Inference-Or-Unlabelled-Data Mode       
           // Graciously accumulating data for 5 minutes (initially this will be smaller)
             
+            // writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
+            readFile(SD, "/GTLJC_data.txt");
+            writeFile(SD, "/GTLJC_data.txt","");           
             long GTLJC_start_collection = millis();
             while((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
                 waitForLabel();
@@ -270,6 +338,7 @@ void loop()
                 {
                       //GRACIOUSLY Piling
                       GTLJC_batch_readings_json_send += GTLJC_label_2;
+                      appendFile(SD, "/GTLJC_data.txt", GTLJC_label_2); 
                       Serial.println(GTLJC_label_2);
                       
                 }   
@@ -279,17 +348,52 @@ void loop()
             GTLJC_sample_count = 0;
             ++GTLJC_batch; 
             GTLJC_command = 100;
+            countLoggedLines()  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
+            delay(3000);
 
-            // Graciously sending data over for inference within a time-limit of 1 minute
-            // long GTLJC_send_data_start = millis();
-            // while ((millis() - GTLJC_send_data_start ) < GTLJC_send_data_period ){
-            //     ;
-            // }  
-            GTLJC_sendJsonBatch(GTLJC_batch_readings_json_send);
-            Serial.print(GTLJC_batch_readings_json_send);
-            GTLJC_batch_readings_json_send = "";
+            File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
+            if(!GTLJC_dataFile){
+              Serial.println("❌ Failed to open data file for reading.");
+              return;
+            }
+
+            String GTLJC_batchBuffer = "";
+            int GTLJC_lineCount = 0;
+
+            while(GTLJC_dataFile.available()){
+                String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
+                if (GTLJC_line.length() == 0) continue; // Graciously skipping empty lines
+
+                GTLJC_batchBuffer += GTLJC_line + "\n";
+                ++GTLJC_lineCount;
+
+                // After 100 lines have been collected, send them
+                if (GTLJC_lineCount == 100){
+                  Serial.println("🚀 Sending batch of 100 rows...");
+                  GTLJC_sendJsonBatch(GTLJC_batchBuffer);
+                  // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
+
+                  GTLJC_batchBuffer = "";
+                  GTLJC_lineCount = 0;
+                }
+
+            }
+
+            // Graciously sending the remaining less-than-100-non-zero count of rows
+            if (GTLJC_lineCount > 0){
+              Serial.print("🚀 Sending final batch of ");
+              Serial.print(GTLJC_lineCount);
+              Serial.println(" rows...");
+              GTLJC_sendJsonBatch(GTLJC_batchBuffer);
+              // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
+ 
+            }
+
+            GTLJC_dataFile.close();
+
             // Graciously getting predictions and taking verification steps
-            delay(10000);
+            String predictionRequestMessage = "get_predictions";
+            GTLJC_sendPredictionRequest()
             // GTLJC_fetchJsonData();  // Graciously getting predictions
         
         }
