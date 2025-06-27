@@ -268,7 +268,7 @@ void countLoggedLines(){
   while(GTLJC_dataFile.available()){
     String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
     if (GTLJC_line.length() > 0){
-      ++GTLJC_line;
+      ++GTLJC_lineCount;
     }
   }
 
@@ -318,9 +318,7 @@ void GTLJC_sendPredictionRequest(const String& requestMessage){
           Serial.println("\n✅ HTTPS prediction request-text POST complete.");
 
           GTLJC_command = 100;
-          requestMessage = "";
-          Serial.print("Checking if request message is emptied, request-message-content : ")
-          Serial.println(requestMessage);
+         
           // WiFi.disconnect(true);
           delay(2000);
 }
@@ -351,7 +349,7 @@ void loop()
             GTLJC_sample_count = 0;
             ++GTLJC_batch; 
             GTLJC_command = 100;
-            countLoggedLines()  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
+            countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
             delay(3000);
 
             File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
@@ -395,15 +393,22 @@ void loop()
             GTLJC_dataFile.close();
 
             // Graciously getting predictions and taking verification steps
-            String predictionRequestMessage = "get_predictions";
-            GTLJC_sendPredictionRequest(predictionRequestMessage)
+            // String GTLJC_predictionRequestMessage = "get_predictions";
+            // GTLJC_sendPredictionRequest( GTLJC_predictionRequestMessage );
+            //  GTLJC_predictionRequestMessage = "";
+            // Serial.print("Checking if request message is emptied, request-message-content : ");
+            // Serial.println( GTLJC_predictionRequestMessage );
             // GTLJC_fetchJsonData();  // Graciously getting predictions
         
         }
 
 
         if ( GTLJC_command == 90){         // Collect-Labelled-Data-Mode
-              ;
+            String GTLJC_predictionRequestMessage = "get_predictions\r\n";
+            GTLJC_sendPredictionRequest( GTLJC_predictionRequestMessage );
+            GTLJC_predictionRequestMessage = "";
+            Serial.print("Checking if request message is emptied, request-message-content : ");
+            Serial.println( GTLJC_predictionRequestMessage );
         
         }
 
