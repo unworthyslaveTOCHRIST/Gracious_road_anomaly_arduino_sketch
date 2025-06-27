@@ -59,7 +59,7 @@ unsigned long GTLJC_batch = 0;
 long GTLJC_time_to_repeat = 0;
 
 unsigned long GTLJC_interval_of_collection = 60000 * 1; // Graciously defining a 5-minute interval for data collection
-unsigned long GTLJC_send_data_period = 60000 * 2 ; // A 1-minute space allowed for data transfer
+unsigned long GTLJC_send_data_period = 60000 * 0.5 ; // A 1-minute space allowed for data transfer
 
 bool GTLJC_countIsComplete = false;
 bool GTLJC_collectionEnded = false;
@@ -259,21 +259,63 @@ void GTLJC_sendJsonBatch(const String& rawBatch) {
 
 void loop()
 {
-   GTLJC_last_interval_ms = millis();
-  // if(WiFi.status() != WL_CONNECTED)
-  // {
-  //   connectWiFi();
-  // }
-  // else
-  
-    //GTLJC_vibration = pulseIn (GTLJC_vibration_sensor_input, HIGH);
-    waitForLabel();
-    String GTLJC_label =  GTLJC_batch_results[0];
-    String GTLJC_label_2 =  GTLJC_batch_results[1];
+        if ( GTLJC_command == 8){  // Collect-Inference-Or-Unlabelled-Data Mode       
+          // Graciously accumulating data for 5 minutes (initially this will be smaller)
+            
+            long GTLJC_start_collection = millis();
+            while((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
+                waitForLabel();
+                String GTLJC_label_2 =  GTLJC_batch_results[1];
+                if (GTLJC_label_2 != "")
+                {
+                      //GRACIOUSLY Piling
+                      GTLJC_batch_readings_json_send += GTLJC_label_2;
+                      Serial.println(GTLJC_label_2);
+                      
+                }   
+            }
+            
+            GTLJC_command_given = false;
+            GTLJC_sample_count = 0;
+            ++GTLJC_batch; 
+            GTLJC_command = 100;
+
+            // Graciously sending data over for inference within a time-limit of 1 minute
+            // long GTLJC_send_data_start = millis();
+            // while ((millis() - GTLJC_send_data_start ) < GTLJC_send_data_period ){
+            //     ;
+            // }  
+            GTLJC_sendJsonBatch(GTLJC_batch_readings_json_send);
+            Serial.print(GTLJC_batch_readings_json_send);
+            GTLJC_batch_readings_json_send = "";
+            // Graciously getting predictions and taking verification steps
+            delay(10000);
+            // GTLJC_fetchJsonData();  // Graciously getting predictions
+        
+        }
+
+
+        if ( GTLJC_command == 90){         // Collect-Labelled-Data-Mode
+              ;
+        
+        }
+
+        
+        //  GTLJC_last_interval_ms = millis();
+        // if(WiFi.status() != WL_CONNECTED)
+        // {
+        //   connectWiFi();
+        // }
+        // else
+        
+        //GTLJC_vibration = pulseIn (GTLJC_vibration_sensor_input, HIGH);
+        waitForLabel();
+        String GTLJC_label =  GTLJC_batch_results[0];
+        String GTLJC_label_2 =  GTLJC_batch_results[1];
 
     
     
-    //digitalWrite(GTLJC_label_provided_led, LOW);
+        //digitalWrite(GTLJC_label_provided_led, LOW);
     
         if (GTLJC_label != "")
         {
@@ -287,8 +329,9 @@ void loop()
             GTLJC_batch_readings_json_send +=  GTLJC_label_2;
         }
 
+        
 
-              // WiFiClient client;
+        // WiFiClient client;
         Serial.print("Gracious command code: ");
         Serial.println(GTLJC_command);
         
@@ -385,53 +428,7 @@ void loop()
           GTLJC_fetchJsonData();
 
         }
-
-       if ( GTLJC_command == 90){         // Collect-Labelled-Data-Mode
-            ;
-       
-       }
-
-       if ( GTLJC_command == 8){  // Collect-Inference-Or-Unlabelled-Data Mode       
-          // Graciously accumulating data for 5 minutes (initially this will be smaller)
-            long GTLJC_start_collection = millis();
-            while((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
-              if ((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
-                  GTLJC_collectionEnded = true;
-              }
-                waitForLabel();
-                String GTLJC_label_2 =  GTLJC_batch_results[1];
-                if (GTLJC_label_2 != "")
-                {
-                      //GRACIOUSLY Piling
-                      GTLJC_batch_readings_json_send += GTLJC_label;
-                      Serial.println(GTLJC_label);
-                      
-                }   
-            }
-            
-
-            // Graciously sending data over for inference within a time-limit of 1 minute
-            long GTLJC_send_data_start = millis();
-            while ((millis() - GTLJC_send_data_start ) < GTLJC_send_data_period ){
-                ;
-            }
-            GTLJC_command_given = false;
-            GTLJC_sample_count = 0;
-            ++GTLJC_batch; 
-            GTLJC_command = 100;
-            GTLJC_sendJsonBatch(GTLJC_batch_readings_json_send);
-            GTLJC_batch_readings_json_send = "";
-
-            // Graciously getting predictions and taking verification steps
-            delay(10000);
-            GTLJC_fetchJsonData();  // Graciously getting predictions
         
-       }
-       
-       GTLJC_collectionEnded = false;
-        
-        
-
         //delay(2000);
 }
 
@@ -497,7 +494,7 @@ void waitForLabel()
   // Serial.println(GTLJC_timestamp_prev);
   // delay(5000);
   //String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_hdop_acc + ","  + String(GTLJC_timestamp) + ","  + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time  + "," + GPS_n_of_satellite + "," ;
-  String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_timestamp) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time  + "," ;
+  String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_sample_count) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time  + "," ;
   String GTLJC_line_values_send = String(GTLJC_batch) + "," + 
                                                 acc_x + "," + 
                                                 acc_y + "," + 
@@ -513,7 +510,7 @@ void waitForLabel()
                                                 String(GTLJC_sample_count) + "\r\n";
                                                 
   // String GTLJC_label_2 = GTLJC_line_values_send;
-  GTLJC_label_2 = GTLJC_line_values_send;
+  // GTLJC_label_2 = GTLJC_line_values_send;
   if (GTLJC_command_given)
   {
 
@@ -521,72 +518,73 @@ void waitForLabel()
     switch(GTLJC_command){
       case 68:
         GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";   
-        // GTLJC_label_2 = GTLJC_line_values_send;
+        GTLJC_label_2 = GTLJC_line_values_send;
         break;
 
       case 64:
         GTLJC_label = GTLJC_line_values + "smooth,AVERAGE\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 67:
         GTLJC_label = GTLJC_line_values + "walking,HIGH\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 7:
         GTLJC_label = GTLJC_line_values + "crack,LOW\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 21:
         GTLJC_label = GTLJC_line_values + "crack,AVERAGE\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 9:
         GTLJC_label = GTLJC_line_values + "crack,HIGH\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 22:
         GTLJC_label = GTLJC_line_values + "bump,LOW\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
       
       case 25:
         GTLJC_label = GTLJC_line_values + "bump,AVERAGE\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 13:
         GTLJC_label = GTLJC_line_values + "bump,HIGH\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
       
       case 12:
         GTLJC_label = GTLJC_line_values + "road-patch,LOW\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 24:
         GTLJC_label = GTLJC_line_values + "road-patch,AVERAGE\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 94:
         GTLJC_label = GTLJC_line_values + "road-patch,HIGH\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      // case 8:
-      //   GTLJC_label = GTLJC_line_values + "pothole_mild,LOW\n";
-      //   GTLJC_label_2 = GTLJC_line_values_send; 
-      //   break;
+      case 8:
+      // Handling automated inference data collection
+        GTLJC_label = GTLJC_line_values + "pothole_mild,LOW\n";
+        GTLJC_label_2 = GTLJC_line_values_send; 
+        break;
       
       case 28:
         GTLJC_label = GTLJC_line_values + "pothole_mild,AVERAGE\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       // case 90:
@@ -600,7 +598,7 @@ void waitForLabel()
 
       case 82:
         GTLJC_label = GTLJC_line_values + "pothole_severe,AVERAGE\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
+        GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       // case 74:
@@ -611,7 +609,7 @@ void waitForLabel()
 
   }
   
-  if ((GTLJC_command != 8) && (GTLJC_sample_count == 30)){
+  if ((GTLJC_command != 8) && (GTLJC_sample_count == 100)){
     GTLJC_command_given = false;
     GTLJC_sample_count = 0;
     GTLJC_timestamp_prev = 0;
