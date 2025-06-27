@@ -21,7 +21,6 @@ const char* GTLJC_host = "roadanomaly4christalone.pythonanywhere.com";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
 
-
 const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone.pythonanywhere.com/api-road-prediction-output/road_anomaly_predict/";
 const char* API_VERIFICATION = "https://roadanomaly4christalone.pythonanywhere.com/api-road-verification/road_anomaly_verify/";
 const char* API_INFERENCE = "https://roadanomaly4christalone.pythonanywhere.com/api-road-inference-logs/road_anomaly_infer/";
@@ -59,7 +58,11 @@ unsigned long GTLJC_timestamp_prev = 0;
 unsigned long GTLJC_batch = 0;
 long GTLJC_time_to_repeat = 0;
 
+unsigned long GTLJC_interval_of_collection = 60000 * 1; // Graciously defining a 5-minute interval for data collection
+unsigned long GTLJC_send_data_period = 60000 * 2 ; // A 1-minute space allowed for data transfer
+
 bool GTLJC_countIsComplete = false;
+bool GTLJC_collectionEnded = false;
 
 Adafruit_MPU6050 mpu;
 
@@ -208,7 +211,7 @@ String fieldNames[] = {
 
 // Gracious routine for sending Json
 void GTLJC_sendJsonBatch(const String& rawBatch) {
-          Serial.print(rawBatch);
+          
           WiFiClientSecure client;
           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
           // HTTPClient http;
@@ -229,23 +232,28 @@ void GTLJC_sendJsonBatch(const String& rawBatch) {
           client.print("Content-Length: ");
           client.println(rawBatch.length());
           client.println();  // End of headers
-          client.print(rawBatch); // Send raw data
+          
+          client.write((const uint8_t *)rawBatch.c_str(), rawBatch.length());
+          Serial.print(rawBatch);
+          // client.print(rawBatch); // Send raw data
+          
 
           // Graciously reading server response
           Serial.println("📨 Server Response:");
-          while(client.connected()) {
-            while(client.available()){
-              String line = client.readStringUntil('\n');
-              Serial.println(line);
+          while (client.connected() || client.available()) {
+            if (client.available()) {
+              char c = client.read();
+              Serial.print(c);
             }
           }
 
+          // ✅ Always close the connection
           client.stop();
-          Serial.println("✅ HTTPS text POST complete.");
+          Serial.println("\n✅ HTTPS text POST complete.");
 
           GTLJC_command = 100;
           // WiFi.disconnect(true);
-          delay(60000);
+          delay(5000);
 }
 
 
@@ -361,10 +369,11 @@ void loop()
         }
         else if ( GTLJC_command == 66){
           // To graciously handle outgoing inference data 
-          
           GTLJC_sendJsonBatch(GTLJC_batch_readings_json_send);
           // Serial.print(GTLJC_batch_readings_json_send);
-          GTLJC_batch_readings_json_send = "";
+          // GTLJC_batch_readings_json_send = "";
+          
+
 
         }
 
@@ -376,8 +385,53 @@ void loop()
           GTLJC_fetchJsonData();
 
         }
+
+       if ( GTLJC_command == 90){         // Collect-Labelled-Data-Mode
+            ;
+       
+       }
+
+       if ( GTLJC_command == 8){  // Collect-Inference-Or-Unlabelled-Data Mode       
+          // Graciously accumulating data for 5 minutes (initially this will be smaller)
+            long GTLJC_start_collection = millis();
+            while((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
+              if ((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
+                  GTLJC_collectionEnded = true;
+              }
+                waitForLabel();
+                String GTLJC_label_2 =  GTLJC_batch_results[1];
+                if (GTLJC_label_2 != "")
+                {
+                      //GRACIOUSLY Piling
+                      GTLJC_batch_readings_json_send += GTLJC_label;
+                      Serial.println(GTLJC_label);
+                      
+                }   
+            }
+            
+
+            // Graciously sending data over for inference within a time-limit of 1 minute
+            long GTLJC_send_data_start = millis();
+            while ((millis() - GTLJC_send_data_start ) < GTLJC_send_data_period ){
+                ;
+            }
+            GTLJC_command_given = false;
+            GTLJC_sample_count = 0;
+            ++GTLJC_batch; 
+            GTLJC_command = 100;
+            GTLJC_sendJsonBatch(GTLJC_batch_readings_json_send);
+            GTLJC_batch_readings_json_send = "";
+
+            // Graciously getting predictions and taking verification steps
+            delay(10000);
+            GTLJC_fetchJsonData();  // Graciously getting predictions
         
-      
+       }
+       
+       GTLJC_collectionEnded = false;
+        
+        
+
         //delay(2000);
 }
 
@@ -392,6 +446,7 @@ void waitForLabel()
   }
   
   String GTLJC_label = "";
+  String GTLJC_label_2 = "";
 
   if (IrReceiver.decode()) {
       GTLJC_command = IrReceiver.decodedIRData.command;
@@ -455,74 +510,89 @@ void waitForLabel()
                                                 lng + ","  + 
                                                 GPS_hdop_acc + ","  + 
                                                 GPS_data_time + "," + 
-                                                String(GTLJC_sample_count) + "\n";
+                                                String(GTLJC_sample_count) + "\r\n";
                                                 
-  String GTLJC_label_2 = GTLJC_line_values_send;
-  
+  // String GTLJC_label_2 = GTLJC_line_values_send;
+  GTLJC_label_2 = GTLJC_line_values_send;
   if (GTLJC_command_given)
   {
 
     GTLJC_sample_count++;
     switch(GTLJC_command){
       case 68:
-        GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";     
+        GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";   
+        // GTLJC_label_2 = GTLJC_line_values_send;
         break;
 
       case 64:
         GTLJC_label = GTLJC_line_values + "smooth,AVERAGE\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 67:
         GTLJC_label = GTLJC_line_values + "walking,HIGH\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 7:
         GTLJC_label = GTLJC_line_values + "crack,LOW\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 21:
         GTLJC_label = GTLJC_line_values + "crack,AVERAGE\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 9:
         GTLJC_label = GTLJC_line_values + "crack,HIGH\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 22:
         GTLJC_label = GTLJC_line_values + "bump,LOW\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
       
       case 25:
         GTLJC_label = GTLJC_line_values + "bump,AVERAGE\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 13:
         GTLJC_label = GTLJC_line_values + "bump,HIGH\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
       
       case 12:
         GTLJC_label = GTLJC_line_values + "road-patch,LOW\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 24:
         GTLJC_label = GTLJC_line_values + "road-patch,AVERAGE\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 94:
         GTLJC_label = GTLJC_line_values + "road-patch,HIGH\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      case 8:
-        GTLJC_label = GTLJC_line_values + "pothole_mild,LOW\n";
-        break;
+      // case 8:
+      //   GTLJC_label = GTLJC_line_values + "pothole_mild,LOW\n";
+      //   GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
       
       case 28:
         GTLJC_label = GTLJC_line_values + "pothole_mild,AVERAGE\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      case 90:
-        GTLJC_label = GTLJC_line_values + "pothole_mild,HIGH\n";
-        break;
+      // case 90:
+      //   GTLJC_label = GTLJC_line_values + "pothole_mild,HIGH\n";
+      //   GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
 
       // case 66:
       //   GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,LOW\n";
@@ -530,6 +600,7 @@ void waitForLabel()
 
       case 82:
         GTLJC_label = GTLJC_line_values + "pothole_severe,AVERAGE\n";
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       // case 74:
@@ -540,7 +611,7 @@ void waitForLabel()
 
   }
   
-  if (GTLJC_sample_count == 20){
+  if ((GTLJC_command != 8) && (GTLJC_sample_count == 30)){
     GTLJC_command_given = false;
     GTLJC_sample_count = 0;
     GTLJC_timestamp_prev = 0;
