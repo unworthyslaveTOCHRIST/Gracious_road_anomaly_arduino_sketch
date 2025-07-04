@@ -21,6 +21,7 @@ const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
 const char* GTLJC_path_predictions = "/api-road-prediction-output/road_anomaly_predict/";
+const char* GTLJC_path_verification = "/api-road-verification/road_anomaly_verify/";
 
 const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-prediction-output/road_anomaly_predict/";
 const char* API_VERIFICATION = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-verification/road_anomaly_verify/";
@@ -277,7 +278,7 @@ void countLoggedLines(){
   Serial.println(GTLJC_lineCount);
 }
 
-void GTLJC_sendPredictionRequest(const String& requestMessage){
+String GTLJC_sendPredictionRequest(const String& requestMessage){
           WiFiClientSecure client;
           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
           // HTTPClient http;
@@ -287,7 +288,7 @@ void GTLJC_sendPredictionRequest(const String& requestMessage){
 
           if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
             Serial.println("❌ HTTPS connection failed");
-            return;
+            return "";
           }
 
           // Graciously sending HTTP headers and body
@@ -306,9 +307,11 @@ void GTLJC_sendPredictionRequest(const String& requestMessage){
 
           // Graciously reading server response
           Serial.println("📨 Server Response:");
+          String response = "";
           while (client.connected() || client.available()) {
             if (client.available()){
               char c = client.read();
+              response += c;
               Serial.print(c);
             }
           }
@@ -321,6 +324,93 @@ void GTLJC_sendPredictionRequest(const String& requestMessage){
          
           // WiFi.disconnect(true);
           delay(2000);
+          return response;
+}
+
+void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
+  int idx = 0;
+  while(true){
+    // Graciously finding the next "batch_id"
+    idx = GTLJC_jsonResponse.indexOf("\"batch_id\":", idx);
+    if(idx == -1) break; // There no more prediction rows
+
+    // Graciously moving idx to  the start of the batch_id's value
+    idx += String("\"batch_id\":").length();
+
+    // Graciously extracting batch_id's value
+
+    int GTLJC_batchEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_batchIdStr = GTLJC_jsonResponse.substring(idx, GTLJC_batchEnd);
+    GTLJC_batchIdStr.trim();
+    Serial.print("Batch ID: ");
+    Serial.println(GTLJC_batchIdStr);
+
+    // Graciously finding the next "anomaly_prediction" value
+    idx = GTLJC_jsonResponse.indexOf("\"anomaly_prediction\":", GTLJC_batchEnd);
+    if(idx == -1) break;
+
+    idx += String("\"anomaly_prediction\":").length();
+    // Graciously skipping the initial quotes
+    int GTLJC_predictionStart = GTLJC_jsonResponse.indexOf("\"", idx) + 1; // The anomaly_prediction value is also a string and starts with a double quoted which is now omitted
+    int GTLJC_predictionEnd = GTLJC_jsonResponse.indexOf("\"", GTLJC_predictionStart);
+    String GTLJC_anomalyStr = GTLJC_jsonResponse.substring(GTLJC_predictionStart, GTLJC_predictionEnd);
+    Serial.print("Anomaly Prediction: ");
+    Serial.println(GTLJC_anomalyStr);
+
+    idx = GTLJC_predictionEnd;   // Graciously advancing index idx to scan next row of prediction information
+
+ 
+ 
+  }
+}
+
+String GTLJC_sendVerification(const String& verificationMessage){
+          WiFiClientSecure client;
+          client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
+          // HTTPClient http;
+
+          Serial.print("🌐 Connecting to ");
+          Serial.println(GTLJC_host);
+
+          if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
+            Serial.println("❌ HTTPS connection failed");
+            return "";
+          }
+
+          // Graciously sending HTTP headers and body
+          client.println("POST " + String(GTLJC_path_verification) + " HTTP/1.1");
+          client.println("Host: " + String(GTLJC_host));
+          client.println("Content-Type: text/plain");
+          client.println("Connection: close");
+          client.print("Content-Length: ");
+          client.println(verificationMessage.length());
+          client.println();  // End of headers
+          
+          client.write((const uint8_t *)verificationMessage.c_str(), verificationMessage.length());
+          Serial.print(verificationMessage);
+          // client.print(rawBatch); // Send raw data
+          
+
+          // Graciously reading server response
+          Serial.println("📨 Server Response:");
+          String response = "";
+          while (client.connected() || client.available()) {
+            if (client.available()){
+              char c = client.read();
+              response += c;
+              Serial.print(c);
+            }
+          }
+
+          // ✅ Always close the connection
+          client.stop();
+          Serial.println("\n✅ HTTPS prediction request-text POST complete.");
+
+          GTLJC_command = 100;
+         
+          // WiFi.disconnect(true);
+          delay(2000);
+          return response;
 }
 
 void loop()
@@ -338,7 +428,6 @@ void loop()
                 if (GTLJC_label_2 != "")
                 {
                       //GRACIOUSLY Piling
-                      GTLJC_batch_readings_json_send += GTLJC_label_2;
                       appendFile(SD, "/GTLJC_data.txt", GTLJC_label_2); 
                       Serial.println(GTLJC_label_2);
                       
@@ -403,14 +492,59 @@ void loop()
         }
 
 
-        if ( GTLJC_command == 90){         // Collect-Labelled-Data-Mode
+        if ( GTLJC_command == 90){         //Get predictions pipeline segment
             String GTLJC_predictionRequestMessage = "get_predictions\r\n";
-            GTLJC_sendPredictionRequest( GTLJC_predictionRequestMessage );
+            String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
             GTLJC_predictionRequestMessage = "";
             Serial.print("Checking if request message is emptied, request-message-content : ");
             Serial.println( GTLJC_predictionRequestMessage );
+            Serial.print("Predictions-message repeated ");
+            Serial.println(GTLJC_model_predictions);
+            delay(3000);
+
+            // Verify Data Collected 
+            GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
+            delay(5000);
+            String GTLJC_acceptPredictions = "";
+            Serial.print("Accept or Reject Predictions? ")
+            while (GTLJC_acceptPredictions == ""){
+              
+              if (IrReceiver.decode()) {
+                  GTLJC_command = IrReceiver.decodedIRData.command;
+                  GTLJC_command_given = true;
+                  Serial.println(GTLJC_command);
+                  // delay(5000);
+                  IrReceiver.resume();
+              }
+
+              if (GTLJC_command == 66) // Decoded command for accepting predictions
+              {
+                 GTLJC_acceptPredictions = "accept";
+              }
+              else if (GTLJC_command == 74 )
+              {
+                GTLJC_acceptPredictions = "reject";
+              }
+              delay(10);
+              
+            }
+            Serial.println(GTLJC_acceptPredictions);
+            String GTLJC_verificationConfirmationMessage = GTLJC_sendVerification(GTLJC_acceptPredictions);
+            Serial.print(GTLJC_verificationConfirmationMessage);
+
         
         }
+        
+        //  if ( GTLJC_command == 90){         // Verify Data Collected 
+        //     String GTLJC_predictionRequestMessage = "get_predictions\r\n";
+        //     GTLJC_sendPredictionRequest( GTLJC_predictionRequestMessage );
+        //     GTLJC_predictionRequestMessage = "";
+        //     Serial.print("Checking if request message is emptied, request-message-content : ");
+        //     Serial.println( GTLJC_predictionRequestMessage );
+        
+        // }
+        
+
 
         
         //  GTLJC_last_interval_ms = millis();
@@ -519,27 +653,7 @@ void loop()
               delay(1000);
         }
 
-        if ((millis() - GTLJC_time_to_repeat) < 1000){
-                ;
-        }
-        else if ( GTLJC_command == 66){
-          // To graciously handle outgoing inference data 
-          GTLJC_sendJsonBatch(GTLJC_batch_readings_json_send);
-          // Serial.print(GTLJC_batch_readings_json_send);
-          // GTLJC_batch_readings_json_send = "";
-          
 
-
-        }
-
-        if ((millis() - GTLJC_time_to_repeat) < 1000){
-                ;
-        }
-        else if ( GTLJC_command == 74){
-          // To graciously handle incoming predictions 
-          GTLJC_fetchJsonData();
-
-        }
         
         //delay(2000);
 }
