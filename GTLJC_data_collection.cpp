@@ -17,15 +17,15 @@
 
 const char* ssid = "unworthy slave TO CHRIST";
 const char* password = "FORCHRIST";
-const char* GTLJC_host = "roadanomaly4christalone.pythonanywhere.com";
+const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
 const char* GTLJC_path_predictions = "/api-road-prediction-output/road_anomaly_predict/";
 
-const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone.pythonanywhere.com/api-road-prediction-output/road_anomaly_predict/";
-const char* API_VERIFICATION = "https://roadanomaly4christalone.pythonanywhere.com/api-road-verification/road_anomaly_verify/";
-const char* API_INFERENCE = "https://roadanomaly4christalone.pythonanywhere.com/api-road-inference-logs/road_anomaly_infer/";
-const char* API_INFERENCE_NON_JSON = "https://roadanomaly4christalone.pythonanywhere.com/api-road-inference-logs-raw/road_anomaly_inference_raw/";
+const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-prediction-output/road_anomaly_predict/";
+const char* API_VERIFICATION = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-verification/road_anomaly_verify/";
+const char* API_INFERENCE = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-inference-logs/road_anomaly_infer/";
+const char* API_INFERENCE_NON_JSON = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-inference-logs-raw/road_anomaly_inference_raw/";
 
 #define IR_RECEIVE_PIN 27
 #define IR_SEND_PIN  15
@@ -307,7 +307,7 @@ void GTLJC_sendPredictionRequest(const String& requestMessage){
           // Graciously reading server response
           Serial.println("📨 Server Response:");
           while (client.connected() || client.available()) {
-            if (client.available()) {
+            if (client.available()){
               char c = client.read();
               Serial.print(c);
             }
