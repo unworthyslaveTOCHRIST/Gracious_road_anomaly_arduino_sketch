@@ -492,6 +492,7 @@ void loop()
             // Display Predictions Returned 
             GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
             GTLJC_predictionsReceived = true;
+            digitalWrite(GTLJC_database_transfer_pin,HIGH);
             GTLJC_command = 100;
             delay(5000); 
         
@@ -540,6 +541,7 @@ void loop()
             GTLJC_sendVerification(GTLJC_acceptPredictions);
             GTLJC_acceptPredictions = "";
             GTLJC_predictionsReceived = false;
+            digitalWrite(GTLJC_database_transfer_pin,LOW);
             delay(5000);
 
         }
