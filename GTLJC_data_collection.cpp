@@ -481,19 +481,24 @@ void loop()
             }
 
             GTLJC_dataFile.close();
+            writeFile(SD, "/GTLJC_data.txt", ""); // Graciously emptying acquisition file after sending inference data
 
-            // Graciously getting predictions and taking verification steps
-            // String GTLJC_predictionRequestMessage = "get_predictions";
-            // GTLJC_sendPredictionRequest( GTLJC_predictionRequestMessage );
-            //  GTLJC_predictionRequestMessage = "";
-            // Serial.print("Checking if request message is emptied, request-message-content : ");
-            // Serial.println( GTLJC_predictionRequestMessage );
-            // GTLJC_fetchJsonData();  // Graciously getting predictions
+            // Graciously getting predictions 
+            String GTLJC_predictionRequestMessage = "get_predictions\r\n";
+            String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
+            GTLJC_predictionRequestMessage = "";
+            delay(3000);
+
+            // Display Predictions Returned 
+            GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
+            GTLJC_predictionsReceived = true;
+            GTLJC_command = 100;
+            delay(5000); 
         
         }
 
 
-        if (GTLJC_command == 90){         //Get predictions pipeline segment
+        if (GTLJC_command == 90){         //Standalone predictions-collection routine
             String GTLJC_predictionRequestMessage = "get_predictions\r\n";
             String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
             GTLJC_predictionRequestMessage = "";
@@ -504,15 +509,19 @@ void loop()
             // Verify Data Collected 
             GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
             GTLJC_predictionsReceived = true;
+            GTLJC_command = 100;
             delay(5000);      
-            Serial.print("Accept or Reject Predictions? ");
+            
 
 
 
         }
 
         if(GTLJC_predictionsReceived){
+            Serial.println("Gracious message: Predictions received!");
+            delay(3000);
             String GTLJC_acceptPredictions = "";
+            Serial.println("Accept or Reject Predictions? Press Button 9 or 7 accordingly");
             while(GTLJC_acceptPredictions == ""){
               waitForLabel();
               if (GTLJC_command == 66) // Decoded command for accepting predictions
@@ -533,6 +542,10 @@ void loop()
             GTLJC_predictionsReceived = false;
             delay(5000);
 
+        }
+        else{
+          Serial.println("Gracious message: Predictions not received!");
+          // delay(3000);
         }
         
         // if (GTLJC_command == 66) // Decoded command for accepting predictions
@@ -740,13 +753,13 @@ void waitForLabel()
   if (millis() > 5000 && gps.charsProcessed() < 10)
     Serial.println(F("No GPS data received: check wiring"));
 
-  unsigned long GTLJC_timestamp = GTLJC_sample_count * 3;
+  unsigned long GTLJC_timestamp = millis();
   // GTLJC_timestamp_prev = GTLJC_timestamp;
   // Serial.print("GRACIOUS Previous timestamp");
   // Serial.println(GTLJC_timestamp_prev);
   // delay(5000);
   //String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_hdop_acc + ","  + String(GTLJC_timestamp) + ","  + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time  + "," + GPS_n_of_satellite + "," ;
-  String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_sample_count) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time  + "," ;
+  String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_sample_count * 24) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time + "," ;
   String GTLJC_line_values_send = String(GTLJC_batch) + "," + 
                                                 acc_x + "," + 
                                                 acc_y + "," + 
@@ -759,7 +772,7 @@ void waitForLabel()
                                                 lng + ","  + 
                                                 GPS_hdop_acc + ","  + 
                                                 GPS_data_time + "," + 
-                                                String(GTLJC_sample_count) + "\r\n";
+                                                String(GTLJC_sample_count * 24) + "\r\n";
                                                 
   // String GTLJC_label_2 = GTLJC_line_values_send;
   // GTLJC_label_2 = GTLJC_line_values_send;
@@ -861,7 +874,7 @@ void waitForLabel()
 
   }
   
-  if ((GTLJC_command != 8) && (GTLJC_sample_count == 100)){
+  if ((GTLJC_command != 8) && (GTLJC_sample_count == 101)){
     GTLJC_command_given = false;
     GTLJC_sample_count = 0;
     GTLJC_timestamp_prev = 0;
