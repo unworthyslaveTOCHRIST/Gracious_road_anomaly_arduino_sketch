@@ -620,7 +620,7 @@ void loop()
         }
         else if ( GTLJC_command == 70){
               // Graciously erasing out the entire memory
-              writeFile(SD, "/GTLJC_data.txt","batch,acc_x,acc_y,acc_z,rot_x,rot_y,rot_z,speed,latitude,longitude,accuracy,timestamp,log_interval\n");
+              writeFile(SD, "/GTLJC_data.txt","batch,acc_x,acc_y,acc_z,rot_x,rot_y,rot_z,speed,timestamp,latitude,longitude,accuracy,date_time,anomaly,speed_level\n");
               readFile(SD, "/GTLJC_data.txt");
               GTLJC_batch_readings = "";
               // GTLJC_batch_readings_json_send = "";
