@@ -15,8 +15,8 @@
 #include "ArduinoJson.h"
 #include <WiFiClientSecure.h>
 
-const char* ssid = "unworthy slave TO CHRIST";
-const char* password = "FORCHRIST";
+const char* ssid = "**************";   // Graciously replace with an actual WiFi ssid
+const char* password = "***********";  // Graciously replace with an actual hotspot password
 const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
@@ -28,6 +28,8 @@ const char* API_PREDICTION_OUTPUT = "https://roadanomaly4christalone-d0b8esbucpe
 const char* API_VERIFICATION = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-verification/road_anomaly_verify/";
 const char* API_INFERENCE = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-inference-logs/road_anomaly_infer/";
 const char* API_INFERENCE_NON_JSON = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-inference-logs-raw/road_anomaly_inference_raw/";
+
+const char* API_REGISTERED_ANOMALIES = "https://roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net/api-road-in/road_anomaly_in/";
 
 #define IR_RECEIVE_PIN 27
 #define IR_SEND_PIN  15
@@ -333,23 +335,46 @@ String GTLJC_sendPredictionRequest(const String& requestMessage){
 void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
   int idx = 0;
   while(true){
-    // Graciously finding the next "batch_id"
-    idx = GTLJC_jsonResponse.indexOf("\"batch_id\":", idx);
-    if(idx == -1) break; // There no more prediction rows
+    //Graciously extracting inference-data collection start time
 
-    // Graciously moving idx to  the start of the batch_id's value
-    idx += String("\"batch_id\":").length();
+    idx = GTLJC_jsonResponse.indexOf("\"timestamp\":", idx);
+    if(idx == -1) break;
+    idx  += String("\"timestamp\":").length();
+    int GTLJC_timestampStart = GTLJC_jsonResponse.indexOf("\"", idx) + 1; // The anomaly_prediction value is also a string and starts with a double quoted which is now omitted
+    int GTLJC_timestampEnd = GTLJC_jsonResponse.indexOf("\"", GTLJC_timestampStart);
+    String GTLJC_timestampStr = GTLJC_jsonResponse.substring(GTLJC_timestampStart, GTLJC_timestampEnd);
+    Serial.print("For Inference Data Collected @ ");
+    Serial.print(GTLJC_timestampStr);
+    Serial.print(", ");
 
-    // Graciously extracting batch_id's value
 
-    int GTLJC_batchEnd = GTLJC_jsonResponse.indexOf(",", idx);
-    String GTLJC_batchIdStr = GTLJC_jsonResponse.substring(idx, GTLJC_batchEnd);
-    GTLJC_batchIdStr.trim();
-    Serial.print("Batch ID: ");
-    Serial.println(GTLJC_batchIdStr);
+    //Graciously getting longititude and latitude values from received predictions
+    //Latitude Extraction
+    idx = GTLJC_jsonResponse.indexOf("\"latitude\":", GTLJC_timestampEnd);
+    if(idx == -1) break;
+    idx  += String("\"latitude\":").length();
+
+    int GTLJC_latitudeEnd = GTLJC_jsonResponse.indexOf(",",idx);
+    String GTLJC_latitudeStr = GTLJC_jsonResponse.substring(idx,GTLJC_latitudeEnd);
+    GTLJC_latitudeStr.trim();
+    Serial.print("Latitude: ");
+    Serial.print(GTLJC_latitudeStr);
+    Serial.print(", ");
+
+    //Longitude Extraction
+    idx = GTLJC_jsonResponse.indexOf("\"longitude\":", GTLJC_latitudeEnd);
+    if(idx == -1) break;
+    idx  += String("\"longitude\":").length();
+
+    int GTLJC_longitudeEnd = GTLJC_jsonResponse.indexOf(",",idx);
+    String GTLJC_longitudeStr = GTLJC_jsonResponse.substring(idx,GTLJC_longitudeEnd);
+    GTLJC_longitudeStr.trim();
+    Serial.print("Longitude: ");
+    Serial.print(GTLJC_longitudeStr);
+    Serial.print(", ");
 
     // Graciously finding the next "anomaly_prediction" value
-    idx = GTLJC_jsonResponse.indexOf("\"anomaly_prediction\":", GTLJC_batchEnd);
+    idx = GTLJC_jsonResponse.indexOf("\"anomaly_prediction\":", GTLJC_longitudeEnd);
     if(idx == -1) break;
 
     idx += String("\"anomaly_prediction\":").length();
@@ -423,7 +448,7 @@ void loop()
             
             // writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
             readFile(SD, "/GTLJC_data.txt");
-            writeFile(SD, "/GTLJC_data.txt","");           
+            // writeFile(SD, "/GTLJC_data.txt","");           
             long GTLJC_start_collection = millis();
             while((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
                 waitForLabel();
@@ -483,18 +508,18 @@ void loop()
             GTLJC_dataFile.close();
             writeFile(SD, "/GTLJC_data.txt", ""); // Graciously emptying acquisition file after sending inference data
 
-            // Graciously getting predictions 
-            String GTLJC_predictionRequestMessage = "get_predictions\r\n";
-            String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
-            GTLJC_predictionRequestMessage = "";
-            delay(3000);
+            // // Graciously getting predictions 
+            // String GTLJC_predictionRequestMessage = "get_predictions\r\n";
+            // String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
+            // GTLJC_predictionRequestMessage = "";
+            // delay(3000);
 
-            // Display Predictions Returned 
-            GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
-            GTLJC_predictionsReceived = true;
-            digitalWrite(GTLJC_database_transfer_pin,HIGH);
-            GTLJC_command = 100;
-            delay(5000); 
+            // // Display Predictions Returned 
+            // GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
+            // GTLJC_predictionsReceived = true;
+            // digitalWrite(GTLJC_database_transfer_pin,HIGH);
+            // GTLJC_command = 100;
+            // delay(5000); 
         
         }
 
@@ -513,9 +538,30 @@ void loop()
             digitalWrite(GTLJC_database_transfer_pin,HIGH);
             GTLJC_command = 100;
             delay(5000);      
+
+
+        }
+        
+
+        if (GTLJC_command == 12){         //Standalone predictions-collection routine
+            String GTLJC_predictionRequestMessage = "start_data_preprocessing\r\n";
+            String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
+            GTLJC_predictionRequestMessage = "";
+            Serial.print("Checking if request message is emptied, prediction-request-message-content : ");
+            Serial.println( GTLJC_predictionRequestMessage );
+            delay(3000);
+
+            // Verify Data Collected 
+            GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
+            for (int GTLJC_i = 0; GTLJC_i < 2; GTLJC_i++){
+              digitalWrite(GTLJC_database_transfer_pin,HIGH);
+              delay(1000);
+              digitalWrite(GTLJC_database_transfer_pin,LOW);
+              delay(1000);
+            }
+            GTLJC_command = 100;
+            delay(2000);      
             
-
-
 
         }
 
@@ -629,6 +675,7 @@ void loop()
               GTLJC_sample_count = 0; 
               GTLJC_timestamp_prev = 0;
               GTLJC_time_to_repeat = millis();
+              
               digitalWrite(GTLJC_database_transfer_pin, HIGH);
               delay(1000);
               digitalWrite(GTLJC_database_transfer_pin, LOW);
@@ -777,8 +824,7 @@ void waitForLabel()
                                                 GPS_data_time + "," + 
                                                 String(GTLJC_sample_count * 24) + "\r\n";
                                                 
-  // String GTLJC_label_2 = GTLJC_line_values_send;
-  // GTLJC_label_2 = GTLJC_line_values_send;
+  GTLJC_label_2 = GTLJC_line_values_send;
   if (GTLJC_command_given)
   {
 
@@ -786,62 +832,62 @@ void waitForLabel()
     switch(GTLJC_command){
       case 68:
         GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";   
-        GTLJC_label_2 = GTLJC_line_values_send;
+        // GTLJC_label_2 = GTLJC_line_values_send;
         break;
         
       case 64:
         GTLJC_label = GTLJC_line_values + "smooth,AVERAGE\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 67:
         GTLJC_label = GTLJC_line_values + "static-vibration,HIGH\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 7:
         GTLJC_label = GTLJC_line_values + "crack,LOW\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 21:
         GTLJC_label = GTLJC_line_values + "crack,AVERAGE\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 9:
         GTLJC_label = GTLJC_line_values + "crack,HIGH\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 22:
         GTLJC_label = GTLJC_line_values + "bump,LOW\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
       
       case 25:
         GTLJC_label = GTLJC_line_values + "bump,AVERAGE\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 13:
         GTLJC_label = GTLJC_line_values + "bump,HIGH\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
       
-      case 12:
-        GTLJC_label = GTLJC_line_values + "road-patch,LOW\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
-        break;
+      // case 12: Sends prompt to preprocess already-sent inference data
+      //   GTLJC_label = GTLJC_line_values + "road-patch,LOW\n";
+      //   GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
 
       case 24:
         GTLJC_label = GTLJC_line_values + "road-patch,AVERAGE\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 94:
         GTLJC_label = GTLJC_line_values + "road-patch,HIGH\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       // case 8:
@@ -852,24 +898,24 @@ void waitForLabel()
       
       case 28:
         GTLJC_label = GTLJC_line_values + "pothole_mild,AVERAGE\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
-
-      // case 90:
+ 
+      // case 90: Reserved for an "Get predictions" command
       //   GTLJC_label = GTLJC_line_values + "pothole_mild,HIGH\n";
       //   GTLJC_label_2 = GTLJC_line_values_send; 
       //   break;
 
-      // case 66:
+      // case 66: Reserved for an "accept predictions" command
       //   GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,LOW\n";
       //   break;
 
       case 82:
         GTLJC_label = GTLJC_line_values + "pothole_severe,AVERAGE\n";
-        GTLJC_label_2 = GTLJC_line_values_send; 
+        // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      // case 74:
+      // case 74: Reserved for a "reject predictions" command
       //   GTLJC_label = GTLJC_line_values + "POTHOLE-SEVERE,HIGH\n";
       //   break;
       
