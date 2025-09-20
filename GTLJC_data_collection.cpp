@@ -13,10 +13,12 @@
 #include "WiFi.h"
 #include "HTTPClient.h"
 #include "ArduinoJson.h"
-#include <WiFiClientSecure.h>
+#include <WiFiClientSecure.h>  
+#include <LiquidCrystal_I2C.h>
+#include <esp_system.h>
 
-const char* ssid = "**************";   // Graciously replace with an actual WiFi ssid
-const char* password = "***********";  // Graciously replace with an actual hotspot password
+String ssid = "*****";
+const char* password = "****";
 const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
@@ -42,6 +44,9 @@ TinyGPSPlus gps;
 // The serial connection to the GPS device
 SoftwareSerial ss(RXPin, TXPin);
 
+// Creating an instance of the LCD_I2C Interface Object
+LiquidCrystal_I2C lcd(0x27,20,4); 
+
 
 String GTLJC_batch_readings = "";
 String GTLJC_batch_readings_json_send = "";
@@ -65,18 +70,120 @@ unsigned long GTLJC_timestamp_prev = 0;
 unsigned long GTLJC_batch = 0;
 long GTLJC_time_to_repeat = 0;
 
-unsigned long GTLJC_interval_of_collection = 60000 * 1; // Graciously defining a 5-minute interval for data collection
+unsigned long GTLJC_interval_of_collection = 60000 * 1; // Graciously defining a 1-minute interval for data collection
 unsigned long GTLJC_send_data_period = 60000 * 0.5 ; // A 1-minute space allowed for data transfer
 
 
 bool GTLJC_predictionsReceived = false;
+bool GTLJC_collecting_data = false;
 
 int GTLJC_arr_of_commands[] = {68,64,67,21,25,24,28,82};
+bool backend_connection_established = false;
+bool verification_process_started = false;
+
+
+void commandsToUse(){
+  
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Anomaly button code");
+      lcd.setCursor(0,1);
+      lcd.print("68 : no-movement");
+      lcd.setCursor(0,2);
+      lcd.print("64 : smooth");
+      lcd.setCursor(0,3);
+      lcd.print("67 : static");
+
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Anomaly button code");
+      lcd.setCursor(0,1);
+      lcd.print("21 : crack");
+      lcd.setCursor(0,2);
+      lcd.print("25 : bump");
+      lcd.setCursor(0,3);
+      lcd.print("24 : road-patch");
+
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Anomaly button code");
+      lcd.setCursor(0,1);
+      lcd.print("28 : pothole_mild");
+      lcd.setCursor(0,2);
+      lcd.print("82 : pothole_high");
+   
+
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Other commands: ");
+      lcd.setCursor(0,1);
+      lcd.print("28 : Get predictions");
+      lcd.setCursor(0,2);
+      lcd.print("82 : Send Inf Data");
+      lcd.setCursor(0,3);
+      lcd.print("24 : Send Lab Data");
+      
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Other commands: ");
+      lcd.setCursor(0,1);
+      lcd.print("28 : Start Data ");
+      lcd.setCursor(0,2);
+      lcd.print("Preprocessing");
+
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Other commands: ");
+      lcd.setCursor(0,1);
+      lcd.print("28 : Accept pred");
+      lcd.setCursor(0,2);
+      lcd.print("28:  Reject pred");
+
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Other commands: ");
+      lcd.setCursor(0,1);
+      lcd.print("28 : Erase Batch");
+      lcd.setCursor(0,2);
+      lcd.print("28: Empty SD card");
+
+}
 
 Adafruit_MPU6050 mpu;
 
+void GTLJC_eraseScreen(){
+      lcd.setCursor(0,0);
+      lcd.print("                    ");
+      lcd.setCursor(0,1);
+      lcd.print("                    ");
+      lcd.setCursor(0,2);
+      lcd.print("                    ");
+      lcd.setCursor(0,3);
+      lcd.print("                    ");
+}
+
 void setup()
 {
+      lcd.init();    
+      lcd.backlight();
+      lcd.setCursor(0,0);
+      lcd.print("   Road Anomaly");
+      lcd.setCursor(0,1);
+      lcd.print("   Detection And");
+      lcd.setCursor(0,2);
+      lcd.print(" Information System");
+      delay(5000);
+      lcd.clear();
+      for (int GTLJC_i = 0; GTLJC_i < 2; GTLJC_i++){
+        commandsToUse();
+      }
 
       Serial.begin(115200);
       ss.begin(GPSBaud);
@@ -90,6 +197,8 @@ void setup()
 
       if(!mpu.begin()){
         Serial.println("GLORY TO GOD ALONE, Failed to find mpu chip");
+        lcd.setCursor(0,0);
+        lcd.print("Failed to find mpu chip");
         while(1)
           delay(10);
       }
@@ -107,24 +216,43 @@ void setup()
 
       if (!SD.begin()) {
             Serial.println("Card Mount Failed");
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Card Mount Failed");
+
             return;
       }
       uint8_t cardType = SD.cardType();
 
       if (cardType == CARD_NONE) {
         Serial.println("No SD card attached");
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("No SD card attached");
         return;
       }
 
       Serial.print("SD Card Type: ");
       if (cardType == CARD_MMC) {
         Serial.println("MMC");
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("MMC");
       } else if (cardType == CARD_SD) {
         Serial.println("SDSC");
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("SDSC");
       } else if (cardType == CARD_SDHC) {
         Serial.println("SDHC");
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("SDHC");
       } else {
         Serial.println("UNKNOWN");
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("UNKNOWN");
       }
 
       uint64_t cardSize = SD.cardSize() / (1024 * 1024);
@@ -137,12 +265,24 @@ void setup()
 
       WiFi.begin(ssid,password);
       Serial.print("Connecting to WiFi");
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Connecting to WiFi..");
+      
       while(WiFi.status() != WL_CONNECTED){
         delay(500);
         Serial.print(".");
       }
       Serial.println("\nConnected to WiFi");
-
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Connected to: ");
+      lcd.setCursor(0,1);
+      lcd.print(ssid.substring(0,19));
+      lcd.setCursor(0,2);
+      lcd.print(ssid.substring(19));
+      delay(3000);
+      lcd.clear();
 
 
 }
@@ -219,17 +359,34 @@ String fieldNames[] = {
 };
 
 // Gracious routine for sending Json
-void GTLJC_sendJsonBatch(const String& rawBatch, String GTLJC_url) {        
+String GTLJC_sendJsonBatch(const String& rawBatch, const String& GTLJC_url) {        
           WiFiClientSecure client;
           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
           // HTTPClient http;
 
+          //Restricting client communication(full) timeout to 10 seconds
+          client.setTimeout(10000);
+
+
           Serial.print("🌐 Connecting to ");
           Serial.println(GTLJC_host);
+          // lcd.clear();
+          // lcd.setCursor(0,0);
+          // lcd.print("Connecting to ");
+          // lcd.setCursor(0,1);
+          // lcd.print("Oncloud endpoint");
+          // lcd.setCursor(0,2);
+          // lcd.print("(Backend)");
 
           if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
             Serial.println("❌ HTTPS connection failed");
-            return;
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("HTTPS connection");
+            lcd.setCursor(0,1);
+            lcd.print("failed");
+            backend_connection_established = true;
+            return "";
           }
 
           // Graciously sending HTTP headers and body
@@ -247,27 +404,74 @@ void GTLJC_sendJsonBatch(const String& rawBatch, String GTLJC_url) {
           
 
           // Graciously reading server response
-          Serial.println("📨 Server Response:");
+         Serial.println("📨 Server Response:");
+          String response = "";
+
+          unsigned long startTime = millis();   // Track start time
           while (client.connected() || client.available()) {
             if (client.available()) {
               char c = client.read();
+              response += c;
               Serial.print(c);
             }
           }
           // ✅ Always close the connection
           client.stop();
           Serial.println("\n✅ HTTPS text POST complete.");
+          // lcd.setCursor(0,0);
+          // lcd.print("HTTPS text POST complete.");
+          // lcd.setCursor(0,1);
+          // lcd.print("complete");
 
           GTLJC_command = 100;
           // WiFi.disconnect(true);
-          delay(2000);
+          // delay(2000);
+
+          lcd.setCursor(0,2);
+          lcd.print("          ");
+          return response;
 }
 
-void countLoggedLines(){
+int countLoggedLinesWithoutDisplaying(){
   File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
   if(!GTLJC_dataFile){
     Serial.println("❌ Failed to open file for counting lines.");
-    return;
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Failed to open file");
+    lcd.setCursor(0,1);
+    lcd.print("for counting lines.");
+    delay(3000);
+    
+    return 0;
+  }
+
+  int GTLJC_lineCount = 0;
+  while(GTLJC_dataFile.available()){
+    String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
+    if (GTLJC_line.length() > 0){
+      ++GTLJC_lineCount;
+    }
+  }
+
+  GTLJC_dataFile.close();
+  return GTLJC_lineCount;
+}
+
+
+
+int countLoggedLines(){
+  File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
+  if(!GTLJC_dataFile){
+    Serial.println("❌ Failed to open file for counting lines.");
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Failed to open file");
+    lcd.setCursor(0,1);
+    lcd.print("for counting lines.");
+    delay(3000);
+    
+    return 0;
   }
 
   int GTLJC_lineCount = 0;
@@ -280,57 +484,66 @@ void countLoggedLines(){
 
   GTLJC_dataFile.close();
   Serial.print("✅ Total number of logged lines: ");
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Total number of");
+  lcd.setCursor(0,1);
+  lcd.print("logged lines:");
+  lcd.setCursor(0,2);
+  lcd.print(GTLJC_lineCount);
+  delay(3000);
   Serial.println(GTLJC_lineCount);
+  return GTLJC_lineCount ;
 }
 
-String GTLJC_sendPredictionRequest(const String& requestMessage){
-          WiFiClientSecure client;
-          client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
-          // HTTPClient http;
+// String GTLJC_sendPredictionRequest(const String& requestMessage){
+//           WiFiClientSecure client;
+//           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
+//           // HTTPClient http;
 
-          Serial.print("🌐 Connecting to ");
-          Serial.println(GTLJC_host);
+//           Serial.print("🌐 Connecting to ");
+//           Serial.println(GTLJC_host);
 
-          if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
-            Serial.println("❌ HTTPS connection failed");
-            return "";
-          }
+//           if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
+//             Serial.println("❌ HTTPS connection failed");
+//             return "";
+//           }
 
-          // Graciously sending HTTP headers and body
-          client.println("POST " + String(GTLJC_path_predictions) + " HTTP/1.1");
-          client.println("Host: " + String(GTLJC_host));
-          client.println("Content-Type: text/plain");
-          client.println("Connection: close");
-          client.print("Content-Length: ");
-          client.println(requestMessage.length());
-          client.println();  // End of headers
+//           // Graciously sending HTTP headers and body
+//           client.println("POST " + String(GTLJC_path_predictions) + " HTTP/1.1");
+//           client.println("Host: " + String(GTLJC_host));
+//           client.println("Content-Type: text/plain");
+//           client.println("Connection: close");
+//           client.print("Content-Length: ");
+//           client.println(requestMessage.length());
+//           client.println();  // End of headers
           
-          client.write((const uint8_t *)requestMessage.c_str(), requestMessage.length());
-          Serial.print(requestMessage);
-          // client.print(rawBatch); // Send raw data
+//           client.write((const uint8_t *)requestMessage.c_str(), requestMessage.length());
+//           Serial.print(requestMessage);
+//           // client.print(rawBatch); // Send raw data
           
 
-          // Graciously reading server response
-          Serial.println("📨 Server Response:");
-          String response = "";
-          while (client.connected() || client.available()) {
-            if (client.available()){
-              char c = client.read();
-              response += c;
-              Serial.print(c);
-            }
-          }
+//           // Graciously reading server response
+//           Serial.println("📨 Server Response:");
+//           String response = "";
+//           while (client.connected() || client.available()) {
+//             if (client.available()){
+//               char c = client.read();
+//               response += c;
+//               Serial.print(c);
+//             }
+//           }
 
-          // ✅ Always close the connection
-          client.stop();
-          Serial.println("\n✅ HTTPS prediction request-text POST complete.");
+//           // ✅ Always close the connection
+//           client.stop();
+//           Serial.println("\n✅ HTTPS prediction request-text POST complete.");
 
-          GTLJC_command = 100;
+//           GTLJC_command = 100;
          
-          // WiFi.disconnect(true);
-          delay(2000);
-          return response;
-}
+//           // WiFi.disconnect(true);
+//           delay(2000);
+//           return response;
+// }
 
 void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
   int idx = 0;
@@ -346,6 +559,7 @@ void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
     Serial.print("For Inference Data Collected @ ");
     Serial.print(GTLJC_timestampStr);
     Serial.print(", ");
+
 
 
     //Graciously getting longititude and latitude values from received predictions
@@ -387,69 +601,92 @@ void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
 
     idx = GTLJC_predictionEnd;   // Graciously advancing index idx to scan next row of prediction information
 
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Predicted Anomaly: ");
+    lcd.setCursor(0,1);
+    lcd.print(GTLJC_anomalyStr.substring(0, GTLJC_anomalyStr.length() - 6));
+    lcd.setCursor(0,2);
+    lcd.print(GTLJC_anomalyStr.substring(GTLJC_anomalyStr.length() - 6, GTLJC_anomalyStr.length() - 1 ));
+    lcd.setCursor(0,3);
+    lcd.print("Lat:");
+    lcd.setCursor(5,3);
+    lcd.print(GTLJC_latitudeStr);
+    lcd.setCursor(10,3);
+    lcd.print("Long:");
+    lcd.setCursor(16,3);
+    lcd.print(GTLJC_longitudeStr);
+
  
  
   }
 }
 
-String GTLJC_sendVerification(const String& verificationMessage){
-          WiFiClientSecure client;
-          client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
-          // HTTPClient http;
+// String GTLJC_sendVerification(const String& verificationMessage){
+//           WiFiClientSecure client;
+//           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
+//           // HTTPClient http;
 
-          Serial.print("🌐 Connecting to ");
-          Serial.println(GTLJC_host);
+//           Serial.print("🌐 Connecting to ");
+//           Serial.println(GTLJC_host);
 
-          if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
-            Serial.println("❌ HTTPS connection failed");
-            return "";
-          }
+//           if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
+//             Serial.println("❌ HTTPS connection failed");
+//             return "";
+//           }
 
-          // Graciously sending HTTP headers and body
-          client.println("POST " + String(GTLJC_path_verification) + " HTTP/1.1");
-          client.println("Host: " + String(GTLJC_host));
-          client.println("Content-Type: text/plain");
-          client.println("Connection: close");
-          client.print("Content-Length: ");
-          client.println(verificationMessage.length());
-          client.println();  // End of headers
+//           // Graciously sending HTTP headers and body
+//           client.println("POST " + String(GTLJC_path_verification) + " HTTP/1.1");
+//           client.println("Host: " + String(GTLJC_host));
+//           client.println("Content-Type: text/plain");
+//           client.println("Connection: close");
+//           client.print("Content-Length: ");
+//           client.println(verificationMessage.length());
+//           client.println();  // End of headers
           
-          client.write((const uint8_t *)verificationMessage.c_str(), verificationMessage.length());
-          Serial.print(verificationMessage);
-          // client.print(rawBatch); // Send raw data
+//           client.write((const uint8_t *)verificationMessage.c_str(), verificationMessage.length());
+//           Serial.print(verificationMessage);
+//           // client.print(rawBatch); // Send raw data
           
 
-          // Graciously reading server response
-          Serial.println("📨 Server Response:");
-          String response = "";
-          while (client.connected() || client.available()) {
-            if (client.available()){
-              char c = client.read();
-              response += c;
-              Serial.print(c);
-            }
-          }
+//           // Graciously reading server response
+//           Serial.println("📨 Server Response:");
+//           String response = "";
+//           while (client.connected() || client.available()) {
+//             if (client.available()){
+//               char c = client.read();
+//               response += c;
+//               Serial.print(c);
+//             }
+//           }
 
-          // ✅ Always close the connection
-          client.stop();
-          Serial.println("\n✅ HTTPS prediction request-text POST complete.");
+//           // ✅ Always close the connection
+//           client.stop();
+//           Serial.println("\n✅ HTTPS prediction request-text POST complete.");
 
-          GTLJC_command = 100;
+//           GTLJC_command = 100;
          
-          // WiFi.disconnect(true);
-          delay(2000);
-          return response;
-}
+//           // WiFi.disconnect(true);
+//           delay(2000);
+//           return response;
+// }
 
 void loop()
-{
+{    
+        // Gracious functions for writing into sd card
+
         if ( GTLJC_command == 8){  // Collect-Inference-Or-Unlabelled-Data Mode       
           // Graciously accumulating data for 5 minutes (initially this will be smaller)
             
+            
             // writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
-            readFile(SD, "/GTLJC_data.txt");
+            // readFile(SD, "/GTLJC_data.txt");
             // writeFile(SD, "/GTLJC_data.txt","");           
             long GTLJC_start_collection = millis();
+            lcd.setCursor(0,0);
+            lcd.print("      Getting");     
+            lcd.setCursor(0,1);
+            lcd.print("  inference data...");   
             while((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
                 waitForLabel();
                 String GTLJC_label_2 =  GTLJC_batch_results[1];
@@ -466,18 +703,35 @@ void loop()
             GTLJC_sample_count = 0;
             ++GTLJC_batch; 
             GTLJC_command = 100;
-            countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
+            int total_no_of_logs = countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
             delay(3000);
 
             File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
             if(!GTLJC_dataFile){
               Serial.println("❌ Failed to open data file for reading.");
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Failed to open data");
+              lcd.setCursor(0,1);
+              lcd.print("file for reading.");
               return;
             }
 
             String GTLJC_batchBuffer = "";
             int GTLJC_lineCount = 0;
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Sending inf data   ");
+            lcd.setCursor(0,1);
+            lcd.print("Now Sending: "); 
+            lcd.setCursor(0,2);
+            lcd.print("Remaining: ");
+            lcd.setCursor(11,2);
+            lcd.print(total_no_of_logs);         
+            lcd.setCursor(0,3);
+            lcd.print("On backend: ");
 
+            int batch_factor = 0;
             while(GTLJC_dataFile.available()){
                 String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
                 if (GTLJC_line.length() == 0) continue; // Graciously skipping empty lines
@@ -487,82 +741,127 @@ void loop()
 
                 // After 100 lines have been collected, send them
                 if (GTLJC_lineCount == 100){
-                  Serial.println("🚀 Sending batch of 100 rows...");
-                  GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference));             
+                  String rows_received_in_backend = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference)); 
+                  if(backend_connection_established){
+                    break;
+                  } 
+                  rows_received_in_backend = rows_received_in_backend.substring(rows_received_in_backend.length() - 10, rows_received_in_backend.length() - 1);
+                  lcd.setCursor(11,3);
+                  lcd.print(rows_received_in_backend);
+                  lcd.setCursor(12,1);
+                  lcd.print("100 rows"); 
+                  lcd.setCursor(0,2);
+                  lcd.print("Remaining: ");
+                  lcd.setCursor(11,2);
+                  batch_factor += 1;
+                  lcd.print(total_no_of_logs - batch_factor * 100 );
+                  Serial.println("🚀 Sending batch of 100 rows...");                 
                   GTLJC_batchBuffer = "";
                   GTLJC_lineCount = 0;
                 }
 
             }
 
+            backend_connection_established = false;
+            lcd.setCursor(11,2);
+            lcd.print("      ");
             // Graciously sending the remaining less-than-100-non-zero count of rows
             if (GTLJC_lineCount > 0){
+              String rows_received_in_backend_final = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference));
+              if(backend_connection_established){
+                    ;
+              }  
+              else{
+                rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
+                lcd.setCursor(11,3);
+                lcd.print(rows_received_in_backend_final);
+              }
               Serial.print("🚀 Sending final batch of ");
               Serial.print(GTLJC_lineCount);
               Serial.println(" rows...");
-              GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference));
+              lcd.setCursor(0,0);
+              lcd.print("Sending final batch");     
+              lcd.setCursor(12,1);
+              lcd.print(String(GTLJC_lineCount) + "rows");  
+              lcd.setCursor(11,2);
+              lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
+              
+              
               // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
  
             }
 
             GTLJC_dataFile.close();
-            writeFile(SD, "/GTLJC_data.txt", ""); // Graciously emptying acquisition file after sending inference data
-
-            // // Graciously getting predictions 
-            // String GTLJC_predictionRequestMessage = "get_predictions\r\n";
-            // String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
-            // GTLJC_predictionRequestMessage = "";
-            // delay(3000);
-
-            // // Display Predictions Returned 
-            // GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
-            // GTLJC_predictionsReceived = true;
-            // digitalWrite(GTLJC_database_transfer_pin,HIGH);
-            // GTLJC_command = 100;
-            // delay(5000); 
-        
+            if(!backend_connection_established){
+              writeFile(SD, "/GTLJC_data.txt", ""); // Graciously emptying acquisition file after sending inference data
+            }
+           backend_connection_established = false;
+           lcd.setCursor(0,1);
+           lcd.print("                    ");
+           lcd.setCursor(0,3);
+           lcd.print("                    ");
         }
 
 
         if (GTLJC_command == 90){         //Standalone predictions-collection routine
-            String GTLJC_predictionRequestMessage = "get_predictions\r\n";
-            String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
-            GTLJC_predictionRequestMessage = "";
-            Serial.print("Checking if request message is emptied, prediction-request-message-content : ");
-            Serial.println( GTLJC_predictionRequestMessage );
-            delay(3000);
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("     Requesting");    
+            lcd.setCursor(0,1);
+            lcd.print("     predictions");
 
-            // Verify Data Collected 
-            GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
-            GTLJC_predictionsReceived = true;
-            digitalWrite(GTLJC_database_transfer_pin,HIGH);
+            String GTLJC_predictionRequestMessage = "get_predictions\r\n";
+            String GTLJC_model_predictions = GTLJC_sendJsonBatch(GTLJC_predictionRequestMessage, GTLJC_path_predictions);
+            GTLJC_predictionRequestMessage = "";
+
+            // Verify Data Collected
+            if(backend_connection_established){
+                  lcd.setCursor(0,2);
+                  lcd.print("..request failed..");    
+                  
+            }  
+            else{
+                GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
+                GTLJC_predictionsReceived = true;
+            }
+
+            backend_connection_established = false;
+            
             GTLJC_command = 100;
-            delay(5000);      
+            delay(3000);      
 
 
         }
         
 
         if (GTLJC_command == 12){         //Standalone predictions-collection routine
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Starting");    
+            lcd.setCursor(0,1);
+            lcd.print("on cloud");  
+            lcd.setCursor(0,2);
+            lcd.print("data preprocessing..");
+
             String GTLJC_predictionRequestMessage = "start_data_preprocessing\r\n";
-            String GTLJC_model_predictions = GTLJC_sendPredictionRequest(GTLJC_predictionRequestMessage );
+            String preprocessing_status= GTLJC_sendJsonBatch(GTLJC_predictionRequestMessage, GTLJC_path_predictions);
             GTLJC_predictionRequestMessage = "";
-            Serial.print("Checking if request message is emptied, prediction-request-message-content : ");
-            Serial.println( GTLJC_predictionRequestMessage );
-            delay(3000);
-
             // Verify Data Collected 
-            GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
-            for (int GTLJC_i = 0; GTLJC_i < 2; GTLJC_i++){
-              digitalWrite(GTLJC_database_transfer_pin,HIGH);
-              delay(1000);
-              digitalWrite(GTLJC_database_transfer_pin,LOW);
-              delay(1000);
-            }
-            GTLJC_command = 100;
-            delay(2000);      
-            
+            //GTLJC_parsePredictions(GTLJC_model_predictions);  // The parse predictions function is to later include an LCD display of predictions
 
+            String status_substring = "";
+
+            if(backend_connection_established){
+                  ;
+            }  
+            else{
+              lcd.setCursor(0,3);
+              lcd.print("...command sent...");
+            }
+            delay(3000);  
+            lcd.clear();
+            GTLJC_command = 100;
+               
         }
 
         if(GTLJC_predictionsReceived){
@@ -570,52 +869,70 @@ void loop()
             delay(3000);
             String GTLJC_acceptPredictions = "";
             Serial.println("Accept or Reject Predictions? Press Button 9 or 7 accordingly");
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Accept or ");   
+            lcd.setCursor(0,1);
+            lcd.print("Reject Predictions?");  
+            lcd.setCursor(0,2);
+            lcd.print("Press Button 9");  
+            lcd.setCursor(0,3);
+            lcd.print("or 7 accordingly");
+
+            verification_process_started = true;
+            
             while(GTLJC_acceptPredictions == ""){
               waitForLabel();
               if (GTLJC_command == 66) // Decoded command for accepting predictions
               {
                 GTLJC_acceptPredictions = "accept";
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("Anomaly");  
+                lcd.setCursor(8,0);
+                lcd.print("accept");
+                lcd.setCursor(14,0);
+                lcd.print("ed");
+                delay(2000);  
                 
               }
               else if (GTLJC_command == 74)
               {
                 GTLJC_acceptPredictions = "reject";
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("Anomaly");  
+                lcd.setCursor(8,0);
+                lcd.print("reject");
+                lcd.setCursor(14,0);
+                lcd.print("ed");
+                delay(2000);
                 
               }
               delay(10);
             }
+
             Serial.println(GTLJC_acceptPredictions);
-            GTLJC_sendVerification(GTLJC_acceptPredictions);
+            GTLJC_sendJsonBatch(GTLJC_acceptPredictions, GTLJC_path_verification );
             GTLJC_acceptPredictions = "";
             GTLJC_predictionsReceived = false;
             digitalWrite(GTLJC_database_transfer_pin,LOW);
+            verification_process_started = false;
             delay(5000);
 
         }
         else{
           Serial.println("Gracious message: Predictions not received!");
+   
+          // delay(2000);
           // delay(3000);
         }
-        
-        // if (GTLJC_command == 66) // Decoded command for accepting predictions
-        // {
-        //   GTLJC_acceptPredictions = "accept";
-          
-        // }
-        // else if (GTLJC_command == 74)
-        // {
-        //   GTLJC_acceptPredictions = "reject";
-          
-        // }
+
 
         waitForLabel();
         String GTLJC_label =  GTLJC_batch_results[0];
         String GTLJC_label_2 =  GTLJC_batch_results[1];
-
-    
-    
-        //digitalWrite(GTLJC_label_provided_led, LOW);
-    
+  
         if (GTLJC_label != "")
         {
               //GRACIOUSLY Piling
@@ -630,23 +947,37 @@ void loop()
 
         Serial.print("Gracious command code: ");
         Serial.println(GTLJC_command);
+        if(GTLJC_collecting_data){
+          lcd.setCursor(0,0);
+          lcd.print("Collecting data...    ");
+        }
+        else {
+          lcd.setCursor(0,0);
+          lcd.print("Command code:        ");
+        }
+        
+        
+        if (GTLJC_command == 100){
+          lcd.setCursor(0,1);
+          lcd.print(GTLJC_command);
+          lcd.setCursor(5,1);
+          lcd.print("(idle)         ");
+        }
+        else {
+          lcd.setCursor(0,1);
+          lcd.print(String(GTLJC_command) + "             ");
+        }
         
         for(int GTLJC_i = 0; GTLJC_i < 8; GTLJC_i++){
-          if ( GTLJC_command == GTLJC_arr_of_commands[GTLJC_i] ) {
-                
-                // if (gps.location.isValid())
-                // {
-                //   for (int GTLJC_count = 0; GTLJC_count < 2; GTLJC_count++){
-                //     digitalWrite(GTLJC_database_transfer_pin,HIGH);
-                //     delay(500);
-                //     digitalWrite(GTLJC_database_transfer_pin, LOW);
-                //     delay(500);
-                //   }                  
-                // }
+          if ( GTLJC_command == GTLJC_arr_of_commands[GTLJC_i] ){
+                  GTLJC_collecting_data  =  true;
                   String GTLJC_label =  GTLJC_batch_results[0];
                   if (GTLJC_label != "")
                   {
                         //GRACIOUSLY Piling
+                       
+                        lcd.setCursor(0,0);
+                        lcd.print("Collecting data...    ");  
                         appendFile(SD, "/GTLJC_data.txt", GTLJC_label); 
                         Serial.println(GTLJC_label);
                         
@@ -675,11 +1006,22 @@ void loop()
               GTLJC_sample_count = 0; 
               GTLJC_timestamp_prev = 0;
               GTLJC_time_to_repeat = millis();
+
+              lcd.setCursor(0,2);
+              lcd.print("Erasing SD card   ");     
+              lcd.setCursor(0,3);
+              lcd.print("from " + String(countLoggedLinesWithoutDisplaying()) + " to 0 rows"); 
               
-              digitalWrite(GTLJC_database_transfer_pin, HIGH);
+
+
+              // digitalWrite(GTLJC_database_transfer_pin, HIGH);
               delay(1000);
-              digitalWrite(GTLJC_database_transfer_pin, LOW);
+              // digitalWrite(GTLJC_database_transfer_pin, LOW);
               delay(1000);
+              lcd.setCursor(0,2);
+              lcd.print("                    ");
+              lcd.setCursor(0,3);
+              lcd.print("                    ");
         }
 
         if ((millis() - GTLJC_time_to_repeat) < 1000){
@@ -687,18 +1029,33 @@ void loop()
         }
         else if ( GTLJC_command == 71){
             
-            countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
-            delay(3000);
-
+            int total_no_of_logs = countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
             File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
             if(!GTLJC_dataFile){
               Serial.println("❌ Failed to open data file for reading.");
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Failed to open data");
+              lcd.setCursor(0,1);
+              lcd.print("file for reading.");
               return;
             }
 
             String GTLJC_batchBuffer = "";
             int GTLJC_lineCount = 0;
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Sending trn data   ");
+            lcd.setCursor(0,1);
+            lcd.print("Now Sending: "); 
+            lcd.setCursor(0,2);
+            lcd.print("Remaining: ");
+            lcd.setCursor(11,2);
+            lcd.print(total_no_of_logs);         
+            lcd.setCursor(0,3);
+            lcd.print("On backend: ");
 
+            int batch_factor = 0;
             while(GTLJC_dataFile.available()){
                 String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
                 if (GTLJC_line.length() == 0) continue; // Graciously skipping empty lines
@@ -708,26 +1065,74 @@ void loop()
 
                 // After 100 lines have been collected, send them
                 if (GTLJC_lineCount == 100){
-                  Serial.println("🚀 Sending batch of 100 rows...");
-                  GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_manual_data));            
+                  String rows_received_in_backend = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference)); 
+                  if(backend_connection_established){
+                    break;
+                  } 
+                  rows_received_in_backend = rows_received_in_backend.substring(rows_received_in_backend.length() - 10, rows_received_in_backend.length() - 1);
+                  lcd.setCursor(11,3);
+                  lcd.print(rows_received_in_backend);
+                  lcd.setCursor(12,1);
+                  lcd.print("100 rows"); 
+                  lcd.setCursor(0,2);
+                  lcd.print("Remaining: ");
+                  lcd.setCursor(11,2);
+                  batch_factor += 1;
+                  lcd.print(total_no_of_logs - batch_factor * 100 );
+                  Serial.println("🚀 Sending batch of 100 rows...");                 
                   GTLJC_batchBuffer = "";
                   GTLJC_lineCount = 0;
                 }
 
             }
 
+            backend_connection_established = false;
+            lcd.setCursor(11,2);
+            lcd.print("      ");
             // Graciously sending the remaining less-than-100-non-zero count of rows
             if (GTLJC_lineCount > 0){
+              String rows_received_in_backend_final = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference));
+              if(backend_connection_established){
+                    ;
+              }  
+              else{
+                rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
+                lcd.setCursor(11,3);
+                lcd.print(rows_received_in_backend_final);
+              }
               Serial.print("🚀 Sending final batch of ");
               Serial.print(GTLJC_lineCount);
               Serial.println(" rows...");
-              GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_manual_data));
+              lcd.setCursor(0,0);
+              lcd.print("Sending final batch");     
+              lcd.setCursor(12,1);
+              lcd.print(String(GTLJC_lineCount) + "rows");  
+              lcd.setCursor(11,2);
+              lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
+              
+              
               // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
  
             }
 
-            GTLJC_dataFile.close();   
-            GTLJC_command = 100;  
+            GTLJC_dataFile.close();
+            if(!backend_connection_established){
+              writeFile(SD, "/GTLJC_data.txt", ""); // Graciously emptying acquisition file after sending inference data
+            }
+            backend_connection_established = false;
+            lcd.setCursor(0,1);
+            lcd.print("                    ");
+            lcd.setCursor(0,3);
+            lcd.print("                    ");
+            GTLJC_command = 100; 
+            
+        }
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 69){
+          esp_restart();
         }
 
 
@@ -759,8 +1164,10 @@ void waitForLabel()
       else{
         GTLJC_command = IrReceiver.decodedIRData.command;
         GTLJC_command_given = true;
-        Serial.println(GTLJC_command);
-            // delay(5000);
+        Serial.println(GTLJC_command);     
+        lcd.setCursor(0,1);
+        lcd.print(GTLJC_command); 
+        
       }  
       // GTLJC_lastCommandTime = GTLJC_currentTime;
         IrReceiver.resume();
@@ -802,13 +1209,16 @@ void waitForLabel()
 
   if (millis() > 5000 && gps.charsProcessed() < 10)
     Serial.println(F("No GPS data received: check wiring"));
+    // lcd.clear();
+    // lcd.setCursor(0,0);
+    // lcd.print("No GPS data");     
+    // lcd.setCursor(0,1);
+    // lcd.print("received:"); 
+    // lcd.setCursor(0,2);
+    // lcd.print("check wiring"); 
+    
 
   unsigned long GTLJC_timestamp = millis();
-  // GTLJC_timestamp_prev = GTLJC_timestamp;
-  // Serial.print("GRACIOUS Previous timestamp");
-  // Serial.println(GTLJC_timestamp_prev);
-  // delay(5000);
-  //String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + lat + "," + lng + "," + GPS_speed_kmph + "," + GPS_speed_mps + "," + GPS_hdop_acc + ","  + String(GTLJC_timestamp) + ","  + GPS_altitude_km + "," + GPS_altitude_m + "," + GPS_data_time  + "," + GPS_n_of_satellite + "," ;
   String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_sample_count * 24) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time + "," ;
   String GTLJC_line_values_send = String(GTLJC_batch) + "," + 
                                                 acc_x + "," + 
@@ -929,12 +1339,24 @@ void waitForLabel()
     GTLJC_timestamp_prev = 0;
     ++GTLJC_batch; 
     GTLJC_command = 100;
+    GTLJC_collecting_data  =  false;
     
   }
   Serial.print("GRACIOUS No of samples: ");
   Serial.println(GTLJC_sample_count);
-  //delay(5000);
-  // return GTLJC_label;
+  // lcd.clear();
+  if(!verification_process_started){
+    lcd.setCursor(0,2);
+    lcd.print("No of samples:    ");     
+    lcd.setCursor(0,3);
+    lcd.print("              "); 
+    lcd.setCursor(0,3);
+    lcd.print(GTLJC_sample_count); 
+  }
+  else{
+    ;
+  }
+  
   GTLJC_batch_results[0] = GTLJC_label;
   GTLJC_batch_results[1] = GTLJC_label_2;
 }
