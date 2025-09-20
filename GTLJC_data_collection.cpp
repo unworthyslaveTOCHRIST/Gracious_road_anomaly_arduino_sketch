@@ -17,8 +17,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <esp_system.h>
 
-String ssid = "*****";
-const char* password = "****";
+String ssid = "unworthy slave TO CHRIST";
+const char* password = "i am One With The Lord.";
 const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
@@ -545,6 +545,14 @@ int countLoggedLines(){
 //           return response;
 // }
 
+String anomalyTypeStr = "";
+String anomalyPredictionScore = "";
+void breakString(const String& GTLJC_anomalyStr){
+  int white_space_index = GTLJC_anomalyStr.indexOf(" ");
+  anomalyTypeStr = GTLJC_anomalyStr.substring(0, white_space_index);
+  anomalyPredictionScore = GTLJC_anomalyStr.substring(white_space_index + 1);
+}
+
 void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
   int idx = 0;
   while(true){
@@ -601,13 +609,15 @@ void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
 
     idx = GTLJC_predictionEnd;   // Graciously advancing index idx to scan next row of prediction information
 
+    breakString(GTLJC_anomalyStr);
+
     lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Predicted Anomaly: ");
     lcd.setCursor(0,1);
-    lcd.print(GTLJC_anomalyStr.substring(0, GTLJC_anomalyStr.length() - 6));
+    lcd.print(anomalyTypeStr);
     lcd.setCursor(0,2);
-    lcd.print(GTLJC_anomalyStr.substring(GTLJC_anomalyStr.length() - 6, GTLJC_anomalyStr.length() - 1 ));
+    lcd.print(anomalyPredictionScore);
     lcd.setCursor(0,3);
     lcd.print("Lat:");
     lcd.setCursor(5,3);
@@ -616,9 +626,10 @@ void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
     lcd.print("Long:");
     lcd.setCursor(16,3);
     lcd.print(GTLJC_longitudeStr);
+    anomalyTypeStr = "";
+    anomalyPredictionScore = "";
+    delay(3000);
 
- 
- 
   }
 }
 
@@ -828,7 +839,7 @@ void loop()
             backend_connection_established = false;
             
             GTLJC_command = 100;
-            delay(3000);      
+            delay(1000);      
 
 
         }
@@ -855,6 +866,13 @@ void loop()
                   ;
             }  
             else{
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Starting");    
+              lcd.setCursor(0,1);
+              lcd.print("on cloud");  
+              lcd.setCursor(0,2);
+              lcd.print("data preprocessing..");
               lcd.setCursor(0,3);
               lcd.print("...command sent...");
             }
@@ -959,9 +977,17 @@ void loop()
         
         if (GTLJC_command == 100){
           lcd.setCursor(0,1);
+          lcd.print("                    ");
+          lcd.setCursor(0,1);
           lcd.print(GTLJC_command);
           lcd.setCursor(5,1);
           lcd.print("(idle)         ");
+        }
+        if (GTLJC_command == 0){
+          lcd.setCursor(0,1);
+          lcd.print("                    ");
+          lcd.setCursor(0,1);
+          lcd.print("..PRESS AGAIN..");
         }
         else {
           lcd.setCursor(0,1);
