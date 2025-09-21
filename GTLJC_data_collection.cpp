@@ -17,8 +17,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <esp_system.h>
 
-String ssid = "88888888";
-const char* password = "8888888";
+String ssid = "777777777";
+const char* password = "7777777";
 const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
@@ -877,17 +877,22 @@ void loop()
         }
         else {
           lcd.setCursor(0,0);
-          lcd.print("Command code:        ");
+          lcd.print("Command:             ");
         }
         
         
         if (GTLJC_command == 100){
           lcd.setCursor(0,1);
           lcd.print("                    ");
-          lcd.setCursor(0,1);
-          lcd.print(GTLJC_command);
-          lcd.setCursor(5,1);
-          lcd.print("(idle)         ");
+          if(GTLJC_sample_count == 0){
+            lcd.setCursor(0,1);
+            lcd.print("(idle)               ");
+          }
+          else{
+            lcd.setCursor(0,1);
+            lcd.print("(idle) ..TRY AGAIN..  ");
+          }
+          
         }
         
         else {
@@ -896,10 +901,12 @@ void loop()
         }
 
         if (commandIsNotRecognized (GTLJC_command)){
+          lcd.setCursor(0,0);
+          lcd.print("Command: weak press");
           lcd.setCursor(0,1);
           lcd.print("                    ");
           lcd.setCursor(0,1);
-          lcd.print("..PRESS AGAIN..");
+          lcd.print("  ..TRY AGAIN..  ");
         }
         
         for(int GTLJC_i = 0; GTLJC_i < 8; GTLJC_i++){
@@ -1286,7 +1293,25 @@ void waitForLabel()
     lcd.print(GTLJC_sample_count);
      
   }
-  else if (!verification_process_started){
+  else if (!verification_process_started && GTLJC_command == 100){ 
+    lcd.setCursor(0,3);
+    lcd.print("              ");
+
+    if(GTLJC_sample_count == 0){
+      lcd.setCursor(0,2);
+      lcd.print("                 "); 
+      lcd.setCursor(0,3);
+      lcd.print("              ");
+    }
+    else{
+      lcd.setCursor(0,2);
+      lcd.print("after 100th count ");
+      lcd.setCursor(0,3);
+      lcd.print(GTLJC_sample_count);
+    }
+    
+  }
+  else if (!verification_process_started ) {
     lcd.setCursor(0,2);
     lcd.print("No of samples:    ");     
     lcd.setCursor(0,3);
