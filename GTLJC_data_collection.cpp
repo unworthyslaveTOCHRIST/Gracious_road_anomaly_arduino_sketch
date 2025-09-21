@@ -17,8 +17,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <esp_system.h>
 
-String ssid = "unworthy slave TO CHRIST";
-const char* password = "i am One With The Lord.";
+String ssid = "88888888";
+const char* password = "8888888";
 const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
@@ -80,7 +80,17 @@ bool GTLJC_collecting_data = false;
 int GTLJC_arr_of_commands[] = {68,64,67,21,25,24,28,82};
 bool backend_connection_established = false;
 bool verification_process_started = false;
+int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100};
 
+bool commandIsNotRecognized( int& GTLJC_command){
+  bool commandNotRecognized = true;
+  for (int GTLJC_i = 0; GTLJC_i < 17; GTLJC_i++){
+    if (GTLJC_command == GTLJC_total_arr_of_commands[GTLJC_i]){
+      commandNotRecognized = false;
+    }
+  }
+  return commandNotRecognized;
+}
 
 void commandsToUse(){
   
@@ -364,19 +374,12 @@ String GTLJC_sendJsonBatch(const String& rawBatch, const String& GTLJC_url) {
           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
           // HTTPClient http;
 
-          //Restricting client communication(full) timeout to 10 seconds
+          //Restricting client complete communication to within a timeout of 10 seconds
           client.setTimeout(10000);
 
 
           Serial.print("🌐 Connecting to ");
           Serial.println(GTLJC_host);
-          // lcd.clear();
-          // lcd.setCursor(0,0);
-          // lcd.print("Connecting to ");
-          // lcd.setCursor(0,1);
-          // lcd.print("Oncloud endpoint");
-          // lcd.setCursor(0,2);
-          // lcd.print("(Backend)");
 
           if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
             Serial.println("❌ HTTPS connection failed");
@@ -496,54 +499,6 @@ int countLoggedLines(){
   return GTLJC_lineCount ;
 }
 
-// String GTLJC_sendPredictionRequest(const String& requestMessage){
-//           WiFiClientSecure client;
-//           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
-//           // HTTPClient http;
-
-//           Serial.print("🌐 Connecting to ");
-//           Serial.println(GTLJC_host);
-
-//           if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
-//             Serial.println("❌ HTTPS connection failed");
-//             return "";
-//           }
-
-//           // Graciously sending HTTP headers and body
-//           client.println("POST " + String(GTLJC_path_predictions) + " HTTP/1.1");
-//           client.println("Host: " + String(GTLJC_host));
-//           client.println("Content-Type: text/plain");
-//           client.println("Connection: close");
-//           client.print("Content-Length: ");
-//           client.println(requestMessage.length());
-//           client.println();  // End of headers
-          
-//           client.write((const uint8_t *)requestMessage.c_str(), requestMessage.length());
-//           Serial.print(requestMessage);
-//           // client.print(rawBatch); // Send raw data
-          
-
-//           // Graciously reading server response
-//           Serial.println("📨 Server Response:");
-//           String response = "";
-//           while (client.connected() || client.available()) {
-//             if (client.available()){
-//               char c = client.read();
-//               response += c;
-//               Serial.print(c);
-//             }
-//           }
-
-//           // ✅ Always close the connection
-//           client.stop();
-//           Serial.println("\n✅ HTTPS prediction request-text POST complete.");
-
-//           GTLJC_command = 100;
-         
-//           // WiFi.disconnect(true);
-//           delay(2000);
-//           return response;
-// }
 
 String anomalyTypeStr = "";
 String anomalyPredictionScore = "";
@@ -632,55 +587,6 @@ void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
 
   }
 }
-
-// String GTLJC_sendVerification(const String& verificationMessage){
-//           WiFiClientSecure client;
-//           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
-//           // HTTPClient http;
-
-//           Serial.print("🌐 Connecting to ");
-//           Serial.println(GTLJC_host);
-
-//           if(!client.connect(GTLJC_host, GTLJC_httpsPort)){
-//             Serial.println("❌ HTTPS connection failed");
-//             return "";
-//           }
-
-//           // Graciously sending HTTP headers and body
-//           client.println("POST " + String(GTLJC_path_verification) + " HTTP/1.1");
-//           client.println("Host: " + String(GTLJC_host));
-//           client.println("Content-Type: text/plain");
-//           client.println("Connection: close");
-//           client.print("Content-Length: ");
-//           client.println(verificationMessage.length());
-//           client.println();  // End of headers
-          
-//           client.write((const uint8_t *)verificationMessage.c_str(), verificationMessage.length());
-//           Serial.print(verificationMessage);
-//           // client.print(rawBatch); // Send raw data
-          
-
-//           // Graciously reading server response
-//           Serial.println("📨 Server Response:");
-//           String response = "";
-//           while (client.connected() || client.available()) {
-//             if (client.available()){
-//               char c = client.read();
-//               response += c;
-//               Serial.print(c);
-//             }
-//           }
-
-//           // ✅ Always close the connection
-//           client.stop();
-//           Serial.println("\n✅ HTTPS prediction request-text POST complete.");
-
-//           GTLJC_command = 100;
-         
-//           // WiFi.disconnect(true);
-//           delay(2000);
-//           return response;
-// }
 
 void loop()
 {    
@@ -983,15 +889,17 @@ void loop()
           lcd.setCursor(5,1);
           lcd.print("(idle)         ");
         }
-        if (GTLJC_command == 0){
+        
+        else {
+          lcd.setCursor(0,1);
+          lcd.print(String(GTLJC_command) + "             ");
+        }
+
+        if (commandIsNotRecognized (GTLJC_command)){
           lcd.setCursor(0,1);
           lcd.print("                    ");
           lcd.setCursor(0,1);
           lcd.print("..PRESS AGAIN..");
-        }
-        else {
-          lcd.setCursor(0,1);
-          lcd.print(String(GTLJC_command) + "             ");
         }
         
         for(int GTLJC_i = 0; GTLJC_i < 8; GTLJC_i++){
@@ -1371,13 +1279,20 @@ void waitForLabel()
   Serial.print("GRACIOUS No of samples: ");
   Serial.println(GTLJC_sample_count);
   // lcd.clear();
-  if(!verification_process_started){
+  if(!verification_process_started && commandIsNotRecognized (GTLJC_command)){
+    lcd.setCursor(0,2);
+    lcd.print("after 100th count "); 
+    lcd.setCursor(0,3);
+    lcd.print(GTLJC_sample_count);
+     
+  }
+  else if (!verification_process_started){
     lcd.setCursor(0,2);
     lcd.print("No of samples:    ");     
     lcd.setCursor(0,3);
     lcd.print("              "); 
     lcd.setCursor(0,3);
-    lcd.print(GTLJC_sample_count); 
+    lcd.print(GTLJC_sample_count);
   }
   else{
     ;
