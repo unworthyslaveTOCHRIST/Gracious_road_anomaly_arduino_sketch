@@ -17,8 +17,8 @@
 #include <LiquidCrystal_I2C.h>
 #include <esp_system.h>
 
-String ssid = "777777777";
-const char* password = "7777777";
+String ssid = "";
+const char* password = "";
 const char* GTLJC_host = "roadanomaly4christalone-d0b8esbucpenbdd7.canadacentral-01.azurewebsites.net";
 const int GTLJC_httpsPort = 443;
 const char* GTLJC_path_inference = "/api-road-inference-logs/road_anomaly_infer/";
@@ -81,6 +81,58 @@ int GTLJC_arr_of_commands[] = {68,64,67,21,25,24,28,82};
 bool backend_connection_established = false;
 bool verification_process_started = false;
 int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100};
+// String command_names[] = {
+//   "resetting system    ",
+//   "erasing SD card     ",
+//   "sending lbld data   ",
+//   "no-movement         ",
+//   "smooth road         ",
+//   "static-vibration    ",
+//   "cracks              ",
+//   "bumps               ",
+//   "road patch          ",
+//   "mild pothole        ",
+//   "severe pothole      ",
+//   "sending inf data    ",
+//   "start data preproc  ",
+//   "getting predictions ",
+//   "accept predictions  ",
+//   "reject predictions  ",
+//   "idle                "
+
+// };
+String command_names[] = {
+  "                    ",
+  "                    ",
+  "                    ",
+  "no-movement         ",
+  "smooth road         ",
+  "static-vibration    ",
+  "cracks              ",
+  "bumps               ",
+  "road patch          ",
+  "mild pothole        ",
+  "severe pothole      ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "idle                "
+
+};
+
+
+String get_anomaly_name(int GTLJC_command){
+  for (int GTLJC_i = 0; GTLJC_i < 17; GTLJC_i++){
+    if (GTLJC_command == GTLJC_total_arr_of_commands[GTLJC_i]){
+      return command_names[GTLJC_i];
+    }
+  }
+  return ""; 
+}
+
+bool logs_checked_at_SD_CARD_wipe = false;
 
 bool commandIsNotRecognized( int& GTLJC_command){
   bool commandNotRecognized = true;
@@ -97,76 +149,80 @@ void commandsToUse(){
       delay(3000);
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("Anomaly button code");
+      lcd.print("Anomalies In View:  ");
       lcd.setCursor(0,1);
-      lcd.print("68 : no-movement");
+      lcd.print("no-movement         ");
       lcd.setCursor(0,2);
-      lcd.print("64 : smooth");
+      lcd.print("smooth road         ");
       lcd.setCursor(0,3);
-      lcd.print("67 : static");
+      lcd.print("static-vibration    ");
 
       delay(3000);
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("Anomaly button code");
+      lcd.print("Anomalies In View:  ");
       lcd.setCursor(0,1);
-      lcd.print("21 : crack");
+      lcd.print("cracks              ");
       lcd.setCursor(0,2);
-      lcd.print("25 : bump");
+      lcd.print("bumps               ");
       lcd.setCursor(0,3);
-      lcd.print("24 : road-patch");
+      lcd.print("road patch          ");
 
       delay(3000);
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("Anomaly button code");
+      lcd.print("Anomalies In View:  ");
       lcd.setCursor(0,1);
-      lcd.print("28 : pothole_mild");
+      lcd.print("mild pothole        ");
       lcd.setCursor(0,2);
-      lcd.print("82 : pothole_high");
+      lcd.print("severe pothole      ");
    
 
       delay(3000);
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("Other commands: ");
+      lcd.print("Important commands: ");
       lcd.setCursor(0,1);
-      lcd.print("28 : Get predictions");
+      lcd.print("Btn 6 :get pred     ");
       lcd.setCursor(0,2);
-      lcd.print("82 : Send Inf Data");
+      lcd.print("Btn 4 :acq inf data ");
+    
+
+      delay(3000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Important commands: ");
+      lcd.setCursor(0,1);
+      lcd.print("Btn CH+ :acquire....");
+      lcd.setCursor(0,2);
+      lcd.print("   ...labeled data  ");
       lcd.setCursor(0,3);
-      lcd.print("24 : Send Lab Data");
+      lcd.print("Btn CH- :sys reset  ");
+
       
       delay(3000);
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("Other commands: ");
+      lcd.print("Important commands:   ");
       lcd.setCursor(0,1);
-      lcd.print("28 : Start Data ");
+      lcd.print("Btn 1 :start data...  ");
       lcd.setCursor(0,2);
-      lcd.print("Preprocessing");
+      lcd.print("   ...preprocessing");
+      lcd.setCursor(0,3);
+      lcd.print("Btn CH :empty SDcard");
 
       delay(3000);
       lcd.clear();
       lcd.setCursor(0,0);
-      lcd.print("Other commands: ");
+      lcd.print("Important commands: ");
       lcd.setCursor(0,1);
-      lcd.print("28 : Accept pred");
+      lcd.print("Btn 9 :accept pred  ");
       lcd.setCursor(0,2);
-      lcd.print("28:  Reject pred");
-
-      delay(3000);
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("Other commands: ");
-      lcd.setCursor(0,1);
-      lcd.print("28 : Erase Batch");
-      lcd.setCursor(0,2);
-      lcd.print("28: Empty SD card");
+      lcd.print("Btn 7 :reject pred  ");
 
 }
 
-Adafruit_MPU6050 mpu;
+
 
 void GTLJC_eraseScreen(){
       lcd.setCursor(0,0);
@@ -179,6 +235,8 @@ void GTLJC_eraseScreen(){
       lcd.print("                    ");
 }
 
+
+Adafruit_MPU6050 mpu;
 void setup()
 {
       lcd.init();    
@@ -436,7 +494,7 @@ String GTLJC_sendJsonBatch(const String& rawBatch, const String& GTLJC_url) {
 }
 
 int countLoggedLinesWithoutDisplaying(){
-  File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
+    File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
   if(!GTLJC_dataFile){
     Serial.println("❌ Failed to open file for counting lines.");
     lcd.clear();
@@ -458,7 +516,17 @@ int countLoggedLinesWithoutDisplaying(){
   }
 
   GTLJC_dataFile.close();
-  return GTLJC_lineCount;
+  Serial.print("✅ Total number of logged lines: ");
+  // lcd.clear();
+  // lcd.setCursor(0,0);
+  // lcd.print("Total number of");
+  // lcd.setCursor(0,1);
+  // lcd.print("logged lines:");
+  // lcd.setCursor(0,2);
+  // lcd.print(GTLJC_lineCount);
+  // delay(3000);
+  Serial.println(GTLJC_lineCount);
+  return GTLJC_lineCount ;
 }
 
 
@@ -487,14 +555,21 @@ int countLoggedLines(){
 
   GTLJC_dataFile.close();
   Serial.print("✅ Total number of logged lines: ");
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("Total number of");
-  lcd.setCursor(0,1);
-  lcd.print("logged lines:");
-  lcd.setCursor(0,2);
-  lcd.print(GTLJC_lineCount);
-  delay(3000);
+  if(logs_checked_at_SD_CARD_wipe){
+    ;
+    logs_checked_at_SD_CARD_wipe = false;
+  }
+  else{
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Total number of");
+      lcd.setCursor(0,1);
+      lcd.print("logged lines:");
+      lcd.setCursor(0,2);
+      lcd.print(GTLJC_lineCount);
+      delay(3000);
+  }
+
   Serial.println(GTLJC_lineCount);
   return GTLJC_lineCount ;
 }
@@ -702,7 +777,7 @@ void loop()
               lcd.print(String(GTLJC_lineCount) + "rows");  
               lcd.setCursor(11,2);
               lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
-              
+              delay(3000);
               
               // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
  
@@ -876,8 +951,16 @@ void loop()
           lcd.print("Collecting data...    ");
         }
         else {
-          lcd.setCursor(0,0);
-          lcd.print("Command:             ");
+          
+          if (commandIsNotRecognized (GTLJC_command)){
+              lcd.setCursor(0,0);
+              lcd.print("Command: weak press");
+          }
+          else{
+            lcd.setCursor(0,0);
+            lcd.print("Command:             ");
+          }
+          
         }
         
         
@@ -896,13 +979,26 @@ void loop()
         }
         
         else {
-          lcd.setCursor(0,1);
-          lcd.print(String(GTLJC_command) + "             ");
+          if (commandIsNotRecognized (GTLJC_command)){
+            lcd.setCursor(0,1);
+            lcd.print("  ..TRY AGAIN..  ");
+          }
+          else{
+            
+            if(get_anomaly_name(GTLJC_command) != ""){
+              lcd.setCursor(0,1);
+              lcd.print(get_anomaly_name(GTLJC_command));
+            } 
+            else{
+              lcd.setCursor(0,1);
+              lcd.print("                    ");
+            }
+
+            // lcd.print(String(GTLJC_command) + "             ");
+          }
         }
 
         if (commandIsNotRecognized (GTLJC_command)){
-          lcd.setCursor(0,0);
-          lcd.print("Command: weak press");
           lcd.setCursor(0,1);
           lcd.print("                    ");
           lcd.setCursor(0,1);
@@ -948,16 +1044,26 @@ void loop()
               GTLJC_timestamp_prev = 0;
               GTLJC_time_to_repeat = millis();
 
+              logs_checked_at_SD_CARD_wipe = true;
+
               lcd.setCursor(0,2);
-              lcd.print("Erasing SD card   ");     
+              lcd.print("Erasing SD card   ");   
               lcd.setCursor(0,3);
-              lcd.print("from " + String(countLoggedLinesWithoutDisplaying()) + " to 0 rows"); 
+              lcd.print("                  ");  
+
+              // lcd.setCursor(0,3);
+              // int no_of_logged_lines_in_SD_card = countLoggedLines();
+              // lcd.print("from "); 
+              // lcd.setCursor(5,3);
+              // lcd.print(no_of_logged_lines_in_SD_card);
+              // lcd.setCursor(13,3);
+              // lcd.print(" to 0 rows"); 
               
 
 
               // digitalWrite(GTLJC_database_transfer_pin, HIGH);
               delay(1000);
-              // digitalWrite(GTLJC_database_transfer_pin, LOW);
+              // digitalWrite(GTLJC_database_transfer_pin, LOW); 
               delay(1000);
               lcd.setCursor(0,2);
               lcd.print("                    ");
@@ -1050,7 +1156,7 @@ void loop()
               lcd.print(String(GTLJC_lineCount) + "rows");  
               lcd.setCursor(11,2);
               lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
-              
+              delay(3000);
               
               // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
  
@@ -1073,6 +1179,12 @@ void loop()
                 ;
         }
         else if ( GTLJC_command == 69){
+          lcd.clear();
+          lcd.setCursor(0,0);
+          lcd.print("Restarting...");
+          lcd.setCursor(0,1);
+          lcd.print("Hardware.....");
+          delay(5000);
           esp_restart();
         }
 
