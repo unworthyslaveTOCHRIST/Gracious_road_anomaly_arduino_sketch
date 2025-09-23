@@ -775,6 +775,8 @@ void loop()
               lcd.print("Sending final batch");     
               lcd.setCursor(12,1);
               lcd.print(String(GTLJC_lineCount) + " rows ");  
+              lcd.setCursor(0,2);
+              lcd.print("Remaining: ");
               lcd.setCursor(11,2);
               lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
               delay(5000);
@@ -1154,6 +1156,8 @@ void loop()
               lcd.print("Sending final batch");     
               lcd.setCursor(12,1);
               lcd.print(String(GTLJC_lineCount) + " rows ");   
+              lcd.setCursor(0,2);
+              lcd.print("Remaining: ");
               lcd.setCursor(11,2);
               lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
               delay(5000);
