@@ -774,10 +774,10 @@ void loop()
               lcd.setCursor(0,0);
               lcd.print("Sending final batch");     
               lcd.setCursor(12,1);
-              lcd.print(String(GTLJC_lineCount) + "rows");  
+              lcd.print(String(GTLJC_lineCount) + " rows ");  
               lcd.setCursor(11,2);
               lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
-              delay(3000);
+              delay(5000);
               
               // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
  
@@ -1153,10 +1153,10 @@ void loop()
               lcd.setCursor(0,0);
               lcd.print("Sending final batch");     
               lcd.setCursor(12,1);
-              lcd.print(String(GTLJC_lineCount) + "rows");  
+              lcd.print(String(GTLJC_lineCount) + " rows ");   
               lcd.setCursor(11,2);
               lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
-              delay(3000);
+              delay(5000);
               
               // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
  
