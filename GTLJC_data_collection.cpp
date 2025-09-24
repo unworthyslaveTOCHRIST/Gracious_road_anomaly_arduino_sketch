@@ -80,7 +80,7 @@ bool GTLJC_collecting_data = false;
 int GTLJC_arr_of_commands[] = {68,64,67,21,25,24,28,82};
 bool backend_connection_established = false;
 bool verification_process_started = false;
-int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100};
+int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100,7,9,13,22};
 // String command_names[] = {
 //   "resetting system    ",
 //   "erasing SD card     ",
@@ -146,7 +146,7 @@ bool commandIsNotRecognized( int& GTLJC_command){
 
 void commandsToUse(){
   
-      delay(3000);
+      delay(2000);
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Anomalies In View:  ");
@@ -157,7 +157,7 @@ void commandsToUse(){
       lcd.setCursor(0,3);
       lcd.print("static-vibration    ");
 
-      delay(3000);
+      delay(2000);
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Anomalies In View:  ");
@@ -168,7 +168,7 @@ void commandsToUse(){
       lcd.setCursor(0,3);
       lcd.print("road patch          ");
 
-      delay(3000);
+      delay(2000);
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Anomalies In View:  ");
@@ -188,7 +188,7 @@ void commandsToUse(){
       lcd.print("Btn 4 :acq inf data ");
     
 
-      delay(3000);
+      delay(2000);
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Important commands: ");
@@ -200,7 +200,7 @@ void commandsToUse(){
       lcd.print("Btn CH- :sys reset  ");
 
       
-      delay(3000);
+      delay(2000);
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Important commands:   ");
@@ -211,7 +211,7 @@ void commandsToUse(){
       lcd.setCursor(0,3);
       lcd.print("Btn CH :empty SDcard");
 
-      delay(3000);
+      delay(2000);
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Important commands: ");
@@ -219,6 +219,44 @@ void commandsToUse(){
       lcd.print("Btn 9 :accept pred  ");
       lcd.setCursor(0,2);
       lcd.print("Btn 7 :reject pred  ");
+
+      delay(2000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Important commands:  ");
+      lcd.setCursor(0,1);
+      lcd.print("Btn EQ:accept and ..");
+      lcd.setCursor(0,2);
+      lcd.print("wipe predictions ");
+
+      delay(2000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Important commands:");
+      lcd.setCursor(0,1);
+      lcd.print("Btn -:reject and ..");
+      lcd.setCursor(0,2);
+      lcd.print("wipe predictions ");
+
+      delay(2000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Important commands:");
+      lcd.setCursor(0,1);
+      lcd.print("Btn 200+: send     ");
+      lcd.setCursor(0,2);
+      lcd.print(" leftover data     ");
+
+      delay(2000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Important commands:");
+      lcd.setCursor(0,1);
+      lcd.print("Btn 0:  clean up   ");
+      lcd.setCursor(0,2);
+      lcd.print("inference database ");
+
+      
 
 }
 
@@ -252,7 +290,7 @@ void setup()
       for (int GTLJC_i = 0; GTLJC_i < 2; GTLJC_i++){
         commandsToUse();
       }
-
+      delay(3000);
       Serial.begin(115200);
       ss.begin(GPSBaud);
       pinMode( GTLJC_vibration_sensor_input , INPUT);
@@ -678,7 +716,11 @@ void loop()
             lcd.setCursor(0,0);
             lcd.print("      Getting");     
             lcd.setCursor(0,1);
-            lcd.print("  inference data...");   
+            lcd.print("  inference data...");  
+            lcd.setCursor(0,1);
+            lcd.print("                   ");
+            lcd.setCursor(0,1);
+            lcd.print("  inference data...");    
             while((millis() - GTLJC_start_collection) < GTLJC_interval_of_collection){
                 waitForLabel();
                 String GTLJC_label_2 =  GTLJC_batch_results[1];
@@ -889,11 +931,7 @@ void loop()
                 GTLJC_acceptPredictions = "accept";
                 lcd.clear();
                 lcd.setCursor(0,0);
-                lcd.print("Anomaly");  
-                lcd.setCursor(8,0);
-                lcd.print("accept");
-                lcd.setCursor(14,0);
-                lcd.print("ed");
+                lcd.print("Anomaly accepted");       
                 delay(2000);  
                 
               }
@@ -902,12 +940,35 @@ void loop()
                 GTLJC_acceptPredictions = "reject";
                 lcd.clear();
                 lcd.setCursor(0,0);
-                lcd.print("Anomaly");  
-                lcd.setCursor(8,0);
-                lcd.print("reject");
-                lcd.setCursor(14,0);
-                lcd.print("ed");
+                lcd.print("Anomaly rejected");  
                 delay(2000);
+                
+              }
+             
+
+              else if (GTLJC_command == 7)
+              {
+                GTLJC_acceptPredictions = "accept_without_data_wipe";
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("Anomaly accepted:"); 
+                lcd.setCursor(0,1);
+                lcd.print("inf data (reusable)")   ;    
+                delay(2000); 
+                
+              }
+              
+
+              else if (GTLJC_command == 9)
+              {
+                GTLJC_acceptPredictions = "reject_without_data_wipe";
+                lcd.clear();
+                lcd.setCursor(0,0);
+                lcd.print("Anomaly rejected:");   
+                lcd.setCursor(0,1);
+                lcd.print("inf data (reusable)"); 
+                     
+                delay(2000); 
                 
               }
               delay(10);
@@ -919,7 +980,9 @@ void loop()
             GTLJC_predictionsReceived = false;
             digitalWrite(GTLJC_database_transfer_pin,LOW);
             verification_process_started = false;
+            
             delay(5000);
+            
 
         }
         else{
@@ -1021,10 +1084,6 @@ void loop()
                         Serial.println(GTLJC_label);
                         
                   }   
-
-                // countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
-                // delay(3000);
-
                 
           }
         }
@@ -1052,16 +1111,6 @@ void loop()
               lcd.print("Erasing SD card   ");   
               lcd.setCursor(0,3);
               lcd.print("                  ");  
-
-              // lcd.setCursor(0,3);
-              // int no_of_logged_lines_in_SD_card = countLoggedLines();
-              // lcd.print("from "); 
-              // lcd.setCursor(5,3);
-              // lcd.print(no_of_logged_lines_in_SD_card);
-              // lcd.setCursor(13,3);
-              // lcd.print(" to 0 rows"); 
-              
-
 
               // digitalWrite(GTLJC_database_transfer_pin, HIGH);
               delay(1000);
@@ -1095,6 +1144,150 @@ void loop()
             lcd.clear();
             lcd.setCursor(0,0);
             lcd.print("Sending trn data   ");
+            lcd.setCursor(0,1);
+            lcd.print("Now Sending: "); 
+            lcd.setCursor(0,2);
+            lcd.print("Remaining: ");
+            lcd.setCursor(11,2);
+            lcd.print(total_no_of_logs);         
+            lcd.setCursor(0,3);
+            lcd.print("On backend: ");
+
+            int batch_factor = 0;
+            while(GTLJC_dataFile.available()){
+                String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
+                if (GTLJC_line.length() == 0) continue; // Graciously skipping empty lines
+
+                GTLJC_batchBuffer += GTLJC_line + "\n";
+                ++GTLJC_lineCount;
+
+                // After 100 lines have been collected, send them
+                if (GTLJC_lineCount == 100){
+                  String rows_received_in_backend = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_manual_data)); 
+                  if(backend_connection_established){
+                    break;
+                  } 
+                  rows_received_in_backend = rows_received_in_backend.substring(rows_received_in_backend.length() - 10, rows_received_in_backend.length() - 1);
+                  lcd.setCursor(11,3);
+                  lcd.print(rows_received_in_backend);
+                  lcd.setCursor(12,1);
+                  lcd.print("100 rows"); 
+                  lcd.setCursor(0,2);
+                  lcd.print("Remaining: ");
+                  lcd.setCursor(11,2);
+                  batch_factor += 1;
+                  lcd.print(total_no_of_logs - batch_factor * 100 );
+                  Serial.println("🚀 Sending batch of 100 rows...");                 
+                  GTLJC_batchBuffer = "";
+                  GTLJC_lineCount = 0;
+                }
+
+            }
+
+            backend_connection_established = false;
+            lcd.setCursor(11,2);
+            lcd.print("      ");
+            // Graciously sending the remaining less-than-100-non-zero count of rows
+            if (GTLJC_lineCount > 0){
+              String rows_received_in_backend_final = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_manual_data));
+              if(backend_connection_established){
+                    ;
+              }  
+              else{
+                rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
+                lcd.setCursor(11,3);
+                lcd.print(rows_received_in_backend_final);
+              }
+              Serial.print("🚀 Sending final batch of ");
+              Serial.print(GTLJC_lineCount);
+              Serial.println(" rows...");
+              lcd.setCursor(0,0);
+              lcd.print("Sending final batch");     
+              lcd.setCursor(12,1);
+              lcd.print(String(GTLJC_lineCount) + " rows ");   
+              lcd.setCursor(0,2);
+              lcd.print("Remaining: ");
+              lcd.setCursor(11,2);
+              lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
+              delay(5000);
+              
+         
+            }
+
+            GTLJC_dataFile.close();
+            if(!backend_connection_established){
+              writeFile(SD, "/GTLJC_data.txt", ""); // Graciously emptying acquisition file after sending inference data
+            }
+            backend_connection_established = false;
+            lcd.setCursor(0,1);
+            lcd.print("                    ");
+            lcd.setCursor(0,3);
+            lcd.print("                    ");
+            GTLJC_command = 100; 
+            
+        }
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 69){
+          lcd.clear();
+          lcd.setCursor(0,0);
+          lcd.print("Restarting...");
+          lcd.setCursor(0,1);
+          lcd.print("Hardware.....");
+          delay(5000);
+          esp_restart();
+        }
+
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 22){
+              // Graciously cleaning up inference database
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("    Cleaning up");     
+              lcd.setCursor(0,1);
+              lcd.print("inference database"); 
+              String rows_received_in_backend = GTLJC_sendJsonBatch("clean_up_inference_database", String(GTLJC_path_inference)); 
+              lcd.setCursor(0,2);
+              lcd.print("...successfull..."); 
+              delay(3000);
+              GTLJC_command = 100;
+        }
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 13){
+              // Graciously sending over leftover data in SD card over to backend
+              int total_no_of_logs = countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
+            File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
+            if(!GTLJC_dataFile){
+              Serial.println("❌ Failed to open data file for reading.");
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Failed to open data");
+              lcd.setCursor(0,1);
+              lcd.print("file for reading.");
+              return;
+            }
+
+            String GTLJC_batchBuffer = "";
+            int GTLJC_lineCount = 0;
+            for(int GTLJC_i = 0; GTLJC_i < 2; GTLJC_i++){
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Sending unsent...  ");
+              lcd.setCursor(0,1);
+              lcd.print("... inference data ");
+              delay(2000);
+            }
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Sending... ");
             lcd.setCursor(0,1);
             lcd.print("Now Sending: "); 
             lcd.setCursor(0,2);
@@ -1161,9 +1354,6 @@ void loop()
               lcd.setCursor(11,2);
               lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
               delay(5000);
-              
-              // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
- 
             }
 
             GTLJC_dataFile.close();
@@ -1171,31 +1361,11 @@ void loop()
               writeFile(SD, "/GTLJC_data.txt", ""); // Graciously emptying acquisition file after sending inference data
             }
             backend_connection_established = false;
-            lcd.setCursor(0,1);
-            lcd.print("                    ");
-            lcd.setCursor(0,3);
-            lcd.print("                    ");
+            lcd.clear();
             GTLJC_command = 100; 
             
         }
 
-        if ((millis() - GTLJC_time_to_repeat) < 1000){
-                ;
-        }
-        else if ( GTLJC_command == 69){
-          lcd.clear();
-          lcd.setCursor(0,0);
-          lcd.print("Restarting...");
-          lcd.setCursor(0,1);
-          lcd.print("Hardware.....");
-          delay(5000);
-          esp_restart();
-        }
-
-
-
-        
-        //delay(2000);
 }
 
 void waitForLabel()
