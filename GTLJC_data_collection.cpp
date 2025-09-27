@@ -225,18 +225,18 @@ void commandsToUse(){
       lcd.setCursor(0,0);
       lcd.print("Important commands:  ");
       lcd.setCursor(0,1);
-      lcd.print("Btn EQ:accept and ..");
+      lcd.print("Btn EQ:reject and ..");
       lcd.setCursor(0,2);
-      lcd.print("wipe predictions ");
+      lcd.print("wipe inf data ");
 
       delay(2000);
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Important commands:");
       lcd.setCursor(0,1);
-      lcd.print("Btn -:reject and ..");
+      lcd.print("Btn -:accept and ..");
       lcd.setCursor(0,2);
-      lcd.print("wipe predictions ");
+      lcd.print("wipe inf data ");
 
       delay(2000);
       lcd.clear();
@@ -708,10 +708,7 @@ void loop()
         if ( GTLJC_command == 8){  // Collect-Inference-Or-Unlabelled-Data Mode       
           // Graciously accumulating data for 5 minutes (initially this will be smaller)
             
-            
-            // writeFile(SD, "/GTLJC_data.txt","batch,timestamp/colllection_interval,acc_x ,acc_y,acc_z,rot_x,rot_y ,rot_z,lat,long,GPS_speed_kmph,GPS_speed_mps,GPS_altitude_km,GPS_altitude_m,GPS_data_time,GPS_hdop_acc,GPS_n_of_satellite,anomaly,speed_level_on_encounter\n");
-            // readFile(SD, "/GTLJC_data.txt");
-            // writeFile(SD, "/GTLJC_data.txt","");           
+                     
             long GTLJC_start_collection = millis();
             lcd.setCursor(0,0);
             lcd.print("      Getting");     
@@ -777,6 +774,7 @@ void loop()
                 if (GTLJC_lineCount == 100){
                   String rows_received_in_backend = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference)); 
                   if(backend_connection_established){
+                    lcd.clear();
                     break;
                   } 
                   rows_received_in_backend = rows_received_in_backend.substring(rows_received_in_backend.length() - 10, rows_received_in_backend.length() - 1);
@@ -803,7 +801,7 @@ void loop()
             if (GTLJC_lineCount > 0){
               String rows_received_in_backend_final = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference));
               if(backend_connection_established){
-                    ;
+                    lcd.clear();
               }  
               else{
                 rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
@@ -1165,6 +1163,7 @@ void loop()
                 if (GTLJC_lineCount == 100){
                   String rows_received_in_backend = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_manual_data)); 
                   if(backend_connection_established){
+                    lcd.clear();
                     break;
                   } 
                   rows_received_in_backend = rows_received_in_backend.substring(rows_received_in_backend.length() - 10, rows_received_in_backend.length() - 1);
@@ -1191,7 +1190,7 @@ void loop()
             if (GTLJC_lineCount > 0){
               String rows_received_in_backend_final = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_manual_data));
               if(backend_connection_established){
-                    ;
+                    lcd.clear();
               }  
               else{
                 rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
@@ -1309,6 +1308,7 @@ void loop()
                 if (GTLJC_lineCount == 100){
                   String rows_received_in_backend = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference)); 
                   if(backend_connection_established){
+                    lcd.clear();
                     break;
                   } 
                   rows_received_in_backend = rows_received_in_backend.substring(rows_received_in_backend.length() - 10, rows_received_in_backend.length() - 1);
@@ -1335,7 +1335,7 @@ void loop()
             if (GTLJC_lineCount > 0){
               String rows_received_in_backend_final = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference));
               if(backend_connection_established){
-                    ;
+                    lcd.clear();
               }  
               else{
                 rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
