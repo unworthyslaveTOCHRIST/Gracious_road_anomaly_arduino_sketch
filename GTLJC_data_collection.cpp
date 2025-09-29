@@ -80,7 +80,7 @@ bool GTLJC_collecting_data = false;
 int GTLJC_arr_of_commands[] = {68,64,67,21,25,24,28,82};
 bool backend_connection_established = false;
 bool verification_process_started = false;
-int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100,7,9,13,22};
+int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100,7,9,13,22,94};
 // String command_names[] = {
 //   "resetting system    ",
 //   "erasing SD card     ",
@@ -256,6 +256,16 @@ void commandsToUse(){
       lcd.setCursor(0,2);
       lcd.print("inference database ");
 
+      delay(2000);
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print("Important commands:");
+      lcd.setCursor(0,1);
+      lcd.print("Btn 3: retrieve some ");
+      lcd.setCursor(0,2);
+      lcd.print("cloud stored ");
+      lcd.setCursor(0,2);
+      lcd.print("labelled bump data");
       
 
 }
@@ -470,10 +480,7 @@ String GTLJC_sendJsonBatch(const String& rawBatch, const String& GTLJC_url) {
           client.setInsecure(); // ❗ Trusts all certificates — for development/testing only
           // HTTPClient http;
 
-          //Restricting client complete communication to within a timeout of 10 seconds
-          client.setTimeout(10000);
-
-
+          
           Serial.print("🌐 Connecting to ");
           Serial.println(GTLJC_host);
 
@@ -484,6 +491,7 @@ String GTLJC_sendJsonBatch(const String& rawBatch, const String& GTLJC_url) {
             lcd.print("HTTPS connection");
             lcd.setCursor(0,1);
             lcd.print("failed");
+            delay(3000);
             backend_connection_established = true;
             return "";
           }
@@ -701,6 +709,40 @@ void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
   }
 }
 
+
+void GTLJC_parseIncomingLabelledData(const String& GTLJC_jsonResponse){
+  writeFile(SD, "/GTLJC_data.txt", "");
+  const size_t capacity = 4096;
+  DynamicJsonDocument doc(capacity);
+
+  DeserializationError error = deserializeJson(doc, GTLJC_jsonResponse);
+  if(error){
+      Serial.print("JSON deserialization failed: ");
+      Serial.println(error.c_str());
+      return;
+  }
+
+  Serial.println("\n--- Parsed JSON Fields ---");
+
+  if (!doc.is<JsonArray>()) {
+    Serial.println("Expected JSON Array but got something else.");
+    return;
+  }
+
+  for (JsonObject obj : doc.as<JsonArray>()) {
+    Serial.println("--- Entry ---");
+    for (JsonPair kv : obj) {
+      Serial.print(kv.key().c_str());
+      Serial.print(": ");
+      Serial.println(kv.value().as<String>());
+      appendFile(SD, "/GTLJC_data.txt", kv.value().as<String>());
+      appendFile(SD, "/GTLJC_data.txt", ",");
+    }
+    Serial.println("--------------");
+    appendFile(SD, "/GTLJC_data.txt", "\n");
+  }
+}
+
 void loop()
 {    
         // Gracious functions for writing into sd card
@@ -807,22 +849,21 @@ void loop()
                 rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
                 lcd.setCursor(11,3);
                 lcd.print(rows_received_in_backend_final);
+                Serial.print("🚀 Sending final batch of ");
+                Serial.print(GTLJC_lineCount);
+                Serial.println(" rows...");
+                lcd.setCursor(0,0);
+                lcd.print("Sending final batch");     
+                lcd.setCursor(12,1);
+                lcd.print(String(GTLJC_lineCount) + " rows ");  
+                lcd.setCursor(0,2);
+                lcd.print("Remaining: ");
+                lcd.setCursor(11,2);
+                lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
               }
-              Serial.print("🚀 Sending final batch of ");
-              Serial.print(GTLJC_lineCount);
-              Serial.println(" rows...");
-              lcd.setCursor(0,0);
-              lcd.print("Sending final batch");     
-              lcd.setCursor(12,1);
-              lcd.print(String(GTLJC_lineCount) + " rows ");  
-              lcd.setCursor(0,2);
-              lcd.print("Remaining: ");
-              lcd.setCursor(11,2);
-              lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
+              
               delay(5000);
               
-              // delay(1000) // Inter-batch delay already included in GTLJC_sendJsonBatch routine
- 
             }
 
             GTLJC_dataFile.close();
@@ -1093,7 +1134,8 @@ void loop()
         }
         else if ( GTLJC_command == 70){
               // Graciously erasing out the entire memory
-              writeFile(SD, "/GTLJC_data.txt","batch,acc_x,acc_y,acc_z,rot_x,rot_y,rot_z,speed,timestamp,latitude,longitude,accuracy,date_time,anomaly,speed_level\n");
+              // writeFile(SD, "/GTLJC_data.txt","batch,acc_x,acc_y,acc_z,rot_x,rot_y,rot_z,speed,latitude,longitude,accuracy,date_time,timestamp,anomaly\n");
+              writeFile(SD, "/GTLJC_data.txt", "");
               readFile(SD, "/GTLJC_data.txt");
               GTLJC_batch_readings = "";
               // GTLJC_batch_readings_json_send = "";
@@ -1125,7 +1167,13 @@ void loop()
         }
         else if ( GTLJC_command == 71){
             
+            GTLJC_command_given = false;
+            GTLJC_sample_count = 0;
+            ++GTLJC_batch; 
+            GTLJC_command = 100;
             int total_no_of_logs = countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
+            delay(3000);
+
             File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
             if(!GTLJC_dataFile){
               Serial.println("❌ Failed to open data file for reading.");
@@ -1196,21 +1244,20 @@ void loop()
                 rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
                 lcd.setCursor(11,3);
                 lcd.print(rows_received_in_backend_final);
+                Serial.print("🚀 Sending final batch of ");
+                Serial.print(GTLJC_lineCount);
+                Serial.println(" rows...");
+                lcd.setCursor(0,0);
+                lcd.print("Sending final batch");     
+                lcd.setCursor(12,1);
+                lcd.print(String(GTLJC_lineCount) + " rows ");  
+                lcd.setCursor(0,2);
+                lcd.print("Remaining: ");
+                lcd.setCursor(11,2);
+                lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
               }
-              Serial.print("🚀 Sending final batch of ");
-              Serial.print(GTLJC_lineCount);
-              Serial.println(" rows...");
-              lcd.setCursor(0,0);
-              lcd.print("Sending final batch");     
-              lcd.setCursor(12,1);
-              lcd.print(String(GTLJC_lineCount) + " rows ");   
-              lcd.setCursor(0,2);
-              lcd.print("Remaining: ");
-              lcd.setCursor(11,2);
-              lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
-              delay(5000);
               
-         
+              delay(5000);
             }
 
             GTLJC_dataFile.close();
@@ -1222,7 +1269,6 @@ void loop()
             lcd.print("                    ");
             lcd.setCursor(0,3);
             lcd.print("                    ");
-            GTLJC_command = 100; 
             
         }
 
@@ -1366,6 +1412,42 @@ void loop()
             
         }
 
+
+
+        if ((millis() - GTLJC_time_to_repeat) < 1000){
+                ;
+        }
+        else if ( GTLJC_command == 94){
+          // Graciously sending over command to receive prior/base-manually labelled data
+          lcd.clear();
+          lcd.setCursor(0,0);
+          lcd.print("     Requesting");    
+          lcd.setCursor(0,1);
+          lcd.print("  labelled data");
+
+          String GTLJC_predictionRequestMessage = "retrieve_some_cloud_stored_labelled_bump_data";
+          String GTLJC_oncloud_labelled_data = GTLJC_sendJsonBatch(GTLJC_predictionRequestMessage, GTLJC_path_predictions);
+          GTLJC_predictionRequestMessage = "";
+
+          // Verify Data Was Collected
+          if(backend_connection_established){
+                lcd.setCursor(0,2);
+                lcd.print("..request failed..");    
+                
+          }  
+          else{
+              // Parsing labelled data then storing into SD card
+              GTLJC_parseIncomingLabelledData(GTLJC_oncloud_labelled_data);  // The parse predictions function is to later include an LCD display of predictions
+              lcd.setCursor(0,2);
+              lcd.print("..successful..");
+          }
+          backend_connection_established = false;
+    
+          GTLJC_command = 100;
+          delay(1000);      
+
+        }
+
 }
 
 void waitForLabel()
@@ -1446,7 +1528,7 @@ void waitForLabel()
     
 
   unsigned long GTLJC_timestamp = millis();
-  String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + ","  + String(GTLJC_sample_count * 24) + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time + "," ;
+  String GTLJC_line_values = String(GTLJC_batch) + "," + acc_x + "," + acc_y + "," + acc_z + "," + rot_x + "," + rot_y + "," + rot_z + "," + GPS_speed_mps + "," + lat + "," + lng + ","  + GPS_hdop_acc + ","  + GPS_data_time + "," + String(GTLJC_sample_count * 24) + ",";
   String GTLJC_line_values_send = String(GTLJC_batch) + "," + 
                                                 acc_x + "," + 
                                                 acc_y + "," + 
@@ -1468,49 +1550,49 @@ void waitForLabel()
     GTLJC_sample_count++;
     switch(GTLJC_command){
       case 68:
-        GTLJC_label = GTLJC_line_values + "no-movement,LOW\n";   
+        GTLJC_label = GTLJC_line_values + "no-movement\n";   
         // GTLJC_label_2 = GTLJC_line_values_send;
         break;
         
       case 64:
-        GTLJC_label = GTLJC_line_values + "smooth,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "smooth\n";
         // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
       case 67:
-        GTLJC_label = GTLJC_line_values + "static-vibration,HIGH\n";
+        GTLJC_label = GTLJC_line_values + "static-vibration\n";
         // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      case 7:
-        GTLJC_label = GTLJC_line_values + "crack,LOW\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
-        break;
+      // case 7:
+      //   GTLJC_label = GTLJC_line_values + "crack\n";
+      //   // GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
 
       case 21:
-        GTLJC_label = GTLJC_line_values + "crack,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "crack\n";
         // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      case 9:
-        GTLJC_label = GTLJC_line_values + "crack,HIGH\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
-        break;
+      // case 9:
+      //   GTLJC_label = GTLJC_line_values + "crack,HIGH\n";
+      //   // GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
 
-      case 22:
-        GTLJC_label = GTLJC_line_values + "bump,LOW\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
-        break;
+      // case 22:
+      //   GTLJC_label = GTLJC_line_values + "bump,LOW\n";
+      //   // GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
       
       case 25:
-        GTLJC_label = GTLJC_line_values + "bump,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "bump\n";
         // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      case 13:
-        GTLJC_label = GTLJC_line_values + "bump,HIGH\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
-        break;
+      // case 13:
+      //   GTLJC_label = GTLJC_line_values + "bump,HIGH\n";
+      //   // GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
       
       // case 12: Sends prompt to preprocess already-sent inference data
       //   GTLJC_label = GTLJC_line_values + "road-patch,LOW\n";
@@ -1518,14 +1600,14 @@ void waitForLabel()
       //   break;
 
       case 24:
-        GTLJC_label = GTLJC_line_values + "road-patch,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "road-patch\n";
         // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
-      case 94:
-        GTLJC_label = GTLJC_line_values + "road-patch,HIGH\n";
-        // GTLJC_label_2 = GTLJC_line_values_send; 
-        break;
+      // case 94:
+      //   GTLJC_label = GTLJC_line_values + "road-patch,HIGH\n";
+      //   // GTLJC_label_2 = GTLJC_line_values_send; 
+      //   break;
 
       // case 8:
       // // Handling automated inference data collection
@@ -1534,7 +1616,7 @@ void waitForLabel()
       //   break;
       
       case 28:
-        GTLJC_label = GTLJC_line_values + "pothole_mild,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "pothole_mild\n";
         // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
  
@@ -1548,7 +1630,7 @@ void waitForLabel()
       //   break;
 
       case 82:
-        GTLJC_label = GTLJC_line_values + "pothole_severe,AVERAGE\n";
+        GTLJC_label = GTLJC_line_values + "pothole_severe\n";
         // GTLJC_label_2 = GTLJC_line_values_send; 
         break;
 
