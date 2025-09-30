@@ -70,8 +70,7 @@ unsigned long GTLJC_timestamp_prev = 0;
 unsigned long GTLJC_batch = 0;
 long GTLJC_time_to_repeat = 0;
 
-unsigned long GTLJC_interval_of_collection = 60000 * 1; // Graciously defining a 1-minute interval for data collection
-unsigned long GTLJC_send_data_period = 60000 * 0.5 ; // A 1-minute space allowed for data transfer
+unsigned long GTLJC_interval_of_collection = 60000 * 0.5; // Graciously defining a 1-minute interval for data collection
 
 
 bool GTLJC_predictionsReceived = false;
@@ -80,7 +79,7 @@ bool GTLJC_collecting_data = false;
 int GTLJC_arr_of_commands[] = {68,64,67,21,25,24,28,82};
 bool backend_connection_established = false;
 bool verification_process_started = false;
-int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100,7,9,13,22,94};
+int GTLJC_total_arr_of_commands[] = {69,70,71,68,64,67,21,25,24,28,82,8,12,90,66,74,100,7,9,13,22};  // To graciously include the command code 94 to test the robustness of model's predictions especially as extended to bump data
 // String command_names[] = {
 //   "resetting system    ",
 //   "erasing SD card     ",
@@ -629,6 +628,7 @@ void breakString(const String& GTLJC_anomalyStr){
   anomalyPredictionScore = GTLJC_anomalyStr.substring(white_space_index + 1);
 }
 
+
 void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
   int idx = 0;
   while(true){
@@ -710,36 +710,184 @@ void GTLJC_parsePredictions(const String& GTLJC_jsonResponse){
 }
 
 
+
+
+
 void GTLJC_parseIncomingLabelledData(const String& GTLJC_jsonResponse){
   writeFile(SD, "/GTLJC_data.txt", "");
-  const size_t capacity = 4096;
-  DynamicJsonDocument doc(capacity);
+  int idx = 0;
+  String log_lbld_data = "";
+  while(true){
+    log_lbld_data = "";
+    // -------------------- ID --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"id\":", idx);
+    if (idx == -1) break;
+    idx += String("\"id\":").length();
+    int GTLJC_idEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_idStr = GTLJC_jsonResponse.substring(idx, GTLJC_idEnd);
+    GTLJC_idStr.trim();
+    Serial.print("ID: ");
+    Serial.print(GTLJC_idStr);
+    Serial.print(", ");
+    
+    // -------------------- Batch ID --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"batch_id\":", GTLJC_idEnd);
+    if (idx == -1) break;
+    idx += String("\"batch_id\":").length();
+    int GTLJC_batchEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_batchStr = GTLJC_jsonResponse.substring(idx, GTLJC_batchEnd);
+    GTLJC_batchStr.trim();
+    Serial.print("Batch ID: ");
+    Serial.print(GTLJC_batchStr);
+    Serial.print(", ");
 
-  DeserializationError error = deserializeJson(doc, GTLJC_jsonResponse);
-  if(error){
-      Serial.print("JSON deserialization failed: ");
-      Serial.println(error.c_str());
-      return;
-  }
+    // -------------------- acc_x --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"acc_x\":", GTLJC_batchEnd);
+    if (idx == -1) break;
+    idx += String("\"acc_x\":").length();
+    int GTLJC_accxEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_accxStr = GTLJC_jsonResponse.substring(idx, GTLJC_accxEnd);
+    GTLJC_accxStr.trim();
+    Serial.print("Acc_X: ");
+    Serial.print(GTLJC_accxStr);
+    Serial.print(", ");
 
-  Serial.println("\n--- Parsed JSON Fields ---");
+    // -------------------- acc_y --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"acc_y\":", GTLJC_accxEnd);
+    if (idx == -1) break;
+    idx += String("\"acc_y\":").length();
+    int GTLJC_accyEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_accyStr = GTLJC_jsonResponse.substring(idx, GTLJC_accyEnd);
+    GTLJC_accyStr.trim();
+    Serial.print("Acc_Y: ");
+    Serial.print(GTLJC_accyStr);
+    Serial.print(", ");
 
-  if (!doc.is<JsonArray>()) {
-    Serial.println("Expected JSON Array but got something else.");
-    return;
-  }
+    // -------------------- acc_z --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"acc_z\":", GTLJC_accyEnd);
+    if (idx == -1) break;
+    idx += String("\"acc_z\":").length();
+    int GTLJC_acczEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_acczStr = GTLJC_jsonResponse.substring(idx, GTLJC_acczEnd);
+    GTLJC_acczStr.trim();
+    Serial.print("Acc_Z: ");
+    Serial.print(GTLJC_acczStr);
+    Serial.print(", ");
 
-  for (JsonObject obj : doc.as<JsonArray>()) {
-    Serial.println("--- Entry ---");
-    for (JsonPair kv : obj) {
-      Serial.print(kv.key().c_str());
-      Serial.print(": ");
-      Serial.println(kv.value().as<String>());
-      appendFile(SD, "/GTLJC_data.txt", kv.value().as<String>());
-      appendFile(SD, "/GTLJC_data.txt", ",");
-    }
-    Serial.println("--------------");
-    appendFile(SD, "/GTLJC_data.txt", "\n");
+    // -------------------- rot_x --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"rot_x\":", GTLJC_acczEnd);
+    if (idx == -1) break;
+    idx += String("\"rot_x\":").length();
+    int GTLJC_rotxEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_rotxStr = GTLJC_jsonResponse.substring(idx, GTLJC_rotxEnd);
+    GTLJC_rotxStr.trim();
+    Serial.print("Rot_X: ");
+    Serial.print(GTLJC_rotxStr);
+    Serial.print(", ");
+
+    // -------------------- rot_y --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"rot_y\":", GTLJC_rotxEnd);
+    if (idx == -1) break;
+    idx += String("\"rot_y\":").length();
+    int GTLJC_rotyEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_rotyStr = GTLJC_jsonResponse.substring(idx, GTLJC_rotyEnd);
+    GTLJC_rotyStr.trim();
+    Serial.print("Rot_Y: ");
+    Serial.print(GTLJC_rotyStr);
+    Serial.print(", ");
+
+    // -------------------- rot_z --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"rot_z\":", GTLJC_rotyEnd);
+    if (idx == -1) break;
+    idx += String("\"rot_z\":").length();
+    int GTLJC_rotzEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_rotzStr = GTLJC_jsonResponse.substring(idx, GTLJC_rotzEnd);
+    GTLJC_rotzStr.trim();
+    Serial.print("Rot_Z: ");
+    Serial.print(GTLJC_rotzStr);
+    Serial.print(", ");
+
+    // -------------------- speed --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"speed\":", GTLJC_rotzEnd);
+    if (idx == -1) break;
+    idx += String("\"speed\":").length();
+    int GTLJC_speedEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_speedStr = GTLJC_jsonResponse.substring(idx, GTLJC_speedEnd);
+    GTLJC_speedStr.trim();
+    Serial.print("Speed: ");
+    Serial.print(GTLJC_speedStr);
+    Serial.print(", ");
+  // -------------------- timestamp --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"timestamp\":", GTLJC_speedEnd);
+    if (idx == -1) break;
+    idx += String("\"timestamp\":").length();
+    int GTLJC_timeStart = GTLJC_jsonResponse.indexOf("\"", idx) + 1;
+    int GTLJC_timeEnd = GTLJC_jsonResponse.indexOf("\"", GTLJC_timeStart);
+    String GTLJC_timeStr = GTLJC_jsonResponse.substring(GTLJC_timeStart, GTLJC_timeEnd);
+    GTLJC_timeStr.trim();
+    Serial.print("Timestamp: ");
+    Serial.print(GTLJC_timeStr);
+    Serial.print(", ");
+
+    // -------------------- log_interval --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"log_interval\":", GTLJC_timeEnd);
+    if (idx == -1) break;
+    idx += String("\"log_interval\":").length();
+    int GTLJC_logEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_logStr = GTLJC_jsonResponse.substring(idx, GTLJC_logEnd);
+    GTLJC_logStr.trim();
+    Serial.print("Log Interval: ");
+    Serial.print(GTLJC_logStr);
+    Serial.print(", ");
+
+    // -------------------- latitude --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"latitude\":", GTLJC_logEnd);
+    if (idx == -1) break;
+    idx += String("\"latitude\":").length();
+    int GTLJC_latEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_latStr = GTLJC_jsonResponse.substring(idx, GTLJC_latEnd);
+    GTLJC_latStr.trim();
+    Serial.print("Latitude: ");
+    Serial.print(GTLJC_latStr);
+    Serial.print(", ");
+
+    // -------------------- longitude --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"longitude\":", GTLJC_latEnd);
+    if (idx == -1) break;
+    idx += String("\"longitude\":").length();
+    int GTLJC_longEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_longStr = GTLJC_jsonResponse.substring(idx, GTLJC_longEnd);
+    GTLJC_longStr.trim();
+    Serial.print("Longitude: ");
+    Serial.print(GTLJC_longStr);
+    Serial.print(", ");
+
+    // -------------------- accuracy --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"accuracy\":", GTLJC_longEnd);
+    if (idx == -1) break;
+    idx += String("\"accuracy\":").length();
+    int GTLJC_accuEnd = GTLJC_jsonResponse.indexOf(",", idx);
+    String GTLJC_accuStr = GTLJC_jsonResponse.substring(idx, GTLJC_accuEnd);
+    GTLJC_accuStr.trim();
+    Serial.print("Accuracy: ");
+    Serial.print(GTLJC_accuStr);
+    Serial.print(", ");
+
+    // -------------------- anomaly_prediction --------------------
+    idx = GTLJC_jsonResponse.indexOf("\"anomaly_prediction\":", GTLJC_accuEnd);
+    if (idx == -1) break;
+    idx += String("\"anomaly_prediction\":").length();
+    int GTLJC_predStart = GTLJC_jsonResponse.indexOf("\"", idx) + 1;
+    int GTLJC_predEnd = GTLJC_jsonResponse.indexOf("\"", GTLJC_predStart);
+    String GTLJC_predStr = GTLJC_jsonResponse.substring(GTLJC_predStart, GTLJC_predEnd);
+    GTLJC_predStr.trim();
+    Serial.print("Anomaly Prediction: ");
+    Serial.println(GTLJC_predStr);
+
+    idx = GTLJC_predEnd;
+
+    log_lbld_data = GTLJC_batchStr  + "," + GTLJC_accxStr + "," + GTLJC_accyStr  + "," + GTLJC_acczStr  + "," + GTLJC_rotxStr + "," +  GTLJC_rotyStr + "," + GTLJC_rotzStr + "," + GTLJC_speedStr + "," + GTLJC_latStr + "," + GTLJC_longStr + "," + GTLJC_accuStr  + "," + GTLJC_timeStr + "," + GTLJC_logStr + "\n";
+    appendFile(SD, "/GTLJC_data.txt",log_lbld_data);
   }
 }
 
@@ -1308,7 +1456,7 @@ void loop()
         }
         else if ( GTLJC_command == 13){
               // Graciously sending over leftover data in SD card over to backend
-              int total_no_of_logs = countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
+            int total_no_of_logs = countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
             File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
             if(!GTLJC_dataFile){
               Serial.println("❌ Failed to open data file for reading.");
@@ -1414,39 +1562,141 @@ void loop()
 
 
 
-        if ((millis() - GTLJC_time_to_repeat) < 1000){
-                ;
-        }
-        else if ( GTLJC_command == 94){
-          // Graciously sending over command to receive prior/base-manually labelled data
-          lcd.clear();
-          lcd.setCursor(0,0);
-          lcd.print("     Requesting");    
-          lcd.setCursor(0,1);
-          lcd.print("  labelled data");
+        // if ((millis() - GTLJC_time_to_repeat) < 1000){
+        //         ;
+        // }
+        // else if ( GTLJC_command == 94){
+        //     // Graciously sending over command to receive prior/base-manually labelled data
+        //     lcd.clear();
+        //     lcd.setCursor(0,0);
+        //     lcd.print("     Requesting");    
+        //     lcd.setCursor(0,1);
+        //     lcd.print("  labelled data");
 
-          String GTLJC_predictionRequestMessage = "retrieve_some_cloud_stored_labelled_bump_data";
-          String GTLJC_oncloud_labelled_data = GTLJC_sendJsonBatch(GTLJC_predictionRequestMessage, GTLJC_path_predictions);
-          GTLJC_predictionRequestMessage = "";
+        //     String GTLJC_predictionRequestMessage = "retrieve_some_cloud_stored_labelled_bump_data";
+        //     String GTLJC_oncloud_labelled_data = GTLJC_sendJsonBatch(GTLJC_predictionRequestMessage, GTLJC_path_predictions);
+        //     GTLJC_predictionRequestMessage = "erase_predictions";
+        //     GTLJC_sendJsonBatch(GTLJC_predictionRequestMessage, GTLJC_path_predictions);
+        //     GTLJC_predictionRequestMessage = "";
 
-          // Verify Data Was Collected
-          if(backend_connection_established){
-                lcd.setCursor(0,2);
-                lcd.print("..request failed..");    
-                
-          }  
-          else{
-              // Parsing labelled data then storing into SD card
-              GTLJC_parseIncomingLabelledData(GTLJC_oncloud_labelled_data);  // The parse predictions function is to later include an LCD display of predictions
-              lcd.setCursor(0,2);
-              lcd.print("..successful..");
-          }
-          backend_connection_established = false;
-    
-          GTLJC_command = 100;
-          delay(1000);      
+        //     // Verify Data Was Collected
+        //     if(backend_connection_established){
+        //           lcd.setCursor(0,2);
+        //           lcd.print("..request failed..");                
+        //     }  
+        //     else{
+        //         // Parsing labelled data then storing into SD card
+        //         GTLJC_parseIncomingLabelledData(GTLJC_oncloud_labelled_data);  // The parse predictions function is to later include an LCD display of predictions
+        //         lcd.setCursor(0,2);
+        //         lcd.print("..successful..");
+        //     }
+        //     backend_connection_established = false;
 
-        }
+        //     GTLJC_command_given = false;
+        //     GTLJC_sample_count = 0;
+        //     ++GTLJC_batch; 
+        //     GTLJC_command = 100;
+        //     int total_no_of_logs = countLoggedLines();  // Gracious count of no of logged lines, just before chunk-wise transfer to backend
+        //     delay(3000);
+
+        //     File GTLJC_dataFile = SD.open("/GTLJC_data.txt", FILE_READ);
+        //     if(!GTLJC_dataFile){
+        //       Serial.println("❌ Failed to open data file for reading.");
+        //       lcd.clear();
+        //       lcd.setCursor(0,0);
+        //       lcd.print("Failed to open data");
+        //       lcd.setCursor(0,1);
+        //       lcd.print("file for reading.");
+        //       return;
+        //     }
+
+        //     String GTLJC_batchBuffer = "";
+        //     int GTLJC_lineCount = 0;
+        //     lcd.clear();
+        //     lcd.setCursor(0,0);
+        //     lcd.print("Sending bump data ");
+        //     lcd.setCursor(0,1);
+        //     lcd.print("Now Sending: "); 
+        //     lcd.setCursor(0,2);
+        //     lcd.print("Remaining: ");
+        //     lcd.setCursor(11,2);
+        //     lcd.print(total_no_of_logs);         
+        //     lcd.setCursor(0,3);
+        //     lcd.print("On backend: ");
+
+        //     int batch_factor = 0;
+        //     while(GTLJC_dataFile.available()){
+        //         String GTLJC_line = GTLJC_dataFile.readStringUntil('\n');
+        //         if (GTLJC_line.length() == 0) continue; // Graciously skipping empty lines
+
+        //         GTLJC_batchBuffer += GTLJC_line + "\n";
+        //         ++GTLJC_lineCount;
+
+        //         // After 100 lines have been collected, send them
+        //         if (GTLJC_lineCount == 100){
+        //           String rows_received_in_backend = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference)); 
+        //           if(backend_connection_established){
+        //             lcd.clear();
+        //             break;
+        //           } 
+        //           rows_received_in_backend = rows_received_in_backend.substring(rows_received_in_backend.length() - 10, rows_received_in_backend.length() - 1);
+        //           lcd.setCursor(11,3);
+        //           lcd.print(rows_received_in_backend);
+        //           lcd.setCursor(12,1);
+        //           lcd.print("100 rows"); 
+        //           lcd.setCursor(0,2);
+        //           lcd.print("Remaining: ");
+        //           lcd.setCursor(11,2);
+        //           batch_factor += 1;
+        //           lcd.print(total_no_of_logs - batch_factor * 100 );
+        //           Serial.println("🚀 Sending batch of 100 rows...");                 
+        //           GTLJC_batchBuffer = "";
+        //           GTLJC_lineCount = 0;
+        //         }
+
+        //     }
+
+        //     backend_connection_established = false;
+        //     lcd.setCursor(11,2);
+        //     lcd.print("      ");
+        //     // Graciously sending the remaining less-than-100-non-zero count of rows
+        //     if (GTLJC_lineCount > 0){
+        //       String rows_received_in_backend_final = GTLJC_sendJsonBatch(GTLJC_batchBuffer, String(GTLJC_path_inference));
+        //       if(backend_connection_established){
+        //             lcd.clear();
+        //       }  
+        //       else{
+        //         rows_received_in_backend_final= rows_received_in_backend_final.substring(rows_received_in_backend_final.length() - 10, rows_received_in_backend_final.length() - 1);
+        //         lcd.setCursor(11,3);
+        //         lcd.print(rows_received_in_backend_final);
+        //         Serial.print("🚀 Sending final batch of ");
+        //         Serial.print(GTLJC_lineCount);
+        //         Serial.println(" rows...");
+        //         lcd.setCursor(0,0);
+        //         lcd.print("Sending bump data");     
+        //         lcd.setCursor(12,1);
+        //         lcd.print(String(GTLJC_lineCount) + " rows ");  
+        //         lcd.setCursor(0,2);
+        //         lcd.print("Remaining: ");
+        //         lcd.setCursor(11,2);
+        //         lcd.print(total_no_of_logs - batch_factor * 100 - GTLJC_lineCount);
+        //       }
+              
+        //       delay(5000);
+        //     }
+
+        //     GTLJC_dataFile.close();
+        //     if(!backend_connection_established){
+        //       writeFile(SD, "/GTLJC_data.txt", ""); 
+        //     }
+        //     backend_connection_established = false;
+        //     lcd.setCursor(0,1);
+        //     lcd.print("                    ");
+        //     lcd.setCursor(0,3);
+        //     lcd.print("                    ");
+        // }
+
+
 
 }
 
